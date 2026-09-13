@@ -26,6 +26,7 @@ DEFAULT_KEY_BINDINGS: Dict[str, str] = {
     "definition": "<ctrl>+<shift>+d",
     "table_graph": "<ctrl>+<shift>+g",
     "reword": "<ctrl>+<shift>+r",
+    "reword_popup": "<alt>+p",
     "similar_papers": "<ctrl>+<shift>+p",
     "evidence": "<ctrl>+<shift>+e",
     "source_summary": "<ctrl>+<shift>+u",

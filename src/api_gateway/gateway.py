@@ -213,19 +213,25 @@ class ApiGateway:
         self.cache = ResponseCache(cache_db_path)
         self.telemetry = TokenUsageReport()
         self._client: Optional[httpx.AsyncClient] = None
+        self._client_loop_id: Optional[int] = None
 
     def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
+        # The orchestrator may execute requests with short-lived asyncio.run() loops.
+        # An httpx AsyncClient cannot be reused across those loops.
+        loop_id = id(asyncio.get_running_loop())
+        if self._client is None or self._client.is_closed or self._client_loop_id != loop_id:
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(15.0, connect=5.0),
                 follow_redirects=True,
                 headers={"User-Agent": "ResearchAid-DesktopAssistant/1.0 (mailto:research-aid@local.dev)"},
             )
+            self._client_loop_id = loop_id
         return self._client
 
     async def close(self) -> None:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
+        self._client_loop_id = None
 
     @staticmethod
     def redact_key(text: str) -> str:

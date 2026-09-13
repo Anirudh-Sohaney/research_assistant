@@ -3,6 +3,7 @@
 ## 1. Final Deliverable
 A centralized egress communications and token-efficiency gateway (`api_gateway`) providing:
 - Asynchronous API request dispatching (`dispatch_api_request()`) to external services: Datamuse, FreeDictionary, Semantic Scholar, OpenAlex, arXiv, and authenticated LLM endpoints.
+- Event-loop-safe async client lifecycle for desktop worker requests, allowing repeated popup generations without reusing an `httpx.AsyncClient` across closed asyncio loops.
 - Per-service asynchronous Token Bucket rate limiting.
 - Three-state Circuit Breaker (`CLOSED`, `OPEN`, `HALF_OPEN`) with fast-fail capability during outages.
 - Persistent SQLite disk caching for idempotent GET requests with TTL eviction.

@@ -32,6 +32,7 @@ from lexical_synonyms.synonyms import find_contextual_synonyms
 from overlay_ui.models import CardType, PopupCardPayload, PopupItem, ScreenRect
 from overlay_ui.overlay import OverlayUIManager
 from overlay_ui.pyqt_synonym_overlay import get_synonym_overlay_bridge
+from overlay_ui.reword_overlay import get_reword_overlay_bridge
 from paper_discovery.discovery import discover_similar_papers
 from selection_reader.extractor import extract_selection
 from selection_reader.models import AppInfo, SelectionPayload
@@ -74,6 +75,97 @@ class AppOrchestrator:
         self.total_tokens_consumed = 0
         self.is_running = False
         self.last_foreground_hwnd: Optional[int] = None
+        self._reword_bridge = None
+        self._reword_bridge_connected = False
+        self._reword_selected_text = ""
+        self._reword_target_hwnd: Optional[int] = None
+        self._reword_mode = ""
+        self._reword_style = None
+        self._reword_result = ""
+
+    def _configure_reword_overlay(self):
+        """Connects the interactive reword popup once on the Qt application thread."""
+        bridge = get_reword_overlay_bridge()
+        if bridge is None:
+            return None
+        if not self._reword_bridge_connected:
+            bridge.mode_selected.connect(self._on_reword_mode_selected)
+            bridge.apply_requested.connect(self._apply_reword_result)
+            bridge.regenerate_requested.connect(self._regenerate_reword)
+            self._reword_bridge_connected = True
+        self._reword_bridge = bridge
+        return bridge
+
+    def _open_reword_popup(self, selected_text: str, target_hwnd: Optional[int]):
+        bridge = self._configure_reword_overlay()
+        if bridge is None:
+            return False
+        self._reword_selected_text = selected_text
+        self._reword_target_hwnd = target_hwnd
+        self._reword_mode = ""
+        self._reword_result = ""
+        bridge.sig_show_modes.emit(selected_text)
+        return True
+
+    def _on_reword_mode_selected(self, mode: str):
+        from text_reword.models import RewordStyle
+
+        style_map = {
+            "reword": RewordStyle.ACADEMIC_FORMAL,
+            "add_detail": RewordStyle.EXPANDED_ARGUMENT,
+            "simplify": RewordStyle.SIMPLIFIED_CLARITY,
+        }
+        if mode not in style_map or not self._reword_selected_text or self._reword_bridge is None:
+            return
+        self._reword_mode = mode
+        self._reword_style = style_map[mode]
+        self._generate_reword(bypass_cache=False)
+
+    def _generate_reword(self, bypass_cache: bool):
+        bridge = self._reword_bridge
+        if bridge is None:
+            return
+        bridge.sig_show_loading.emit(self._reword_mode)
+        selected_text = self._reword_selected_text
+        style = self._reword_style
+
+        def worker():
+            try:
+                result = _run_async(
+                    reword_text_segment(
+                        selected_text,
+                        style=style,
+                        bypass_cache=bypass_cache,
+                    )
+                )
+                self._reword_result = result.primary_replacement
+                bridge.sig_show_result.emit(
+                    self._reword_result
+                    or (result.error or "OpenRouter did not return a usable rewording. Press R to retry.")
+                )
+            except Exception as exc:
+                log.error("Interactive reword failed: %s", exc)
+                bridge.sig_show_result.emit("Unable to generate a replacement. Press R to retry.")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _regenerate_reword(self):
+        if self._reword_mode:
+            self._generate_reword(bypass_cache=True)
+
+    def _apply_reword_result(self):
+        if not self._reword_result:
+            return
+        if self._reword_target_hwnd and sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.user32.SetForegroundWindow(self._reword_target_hwnd)
+                time.sleep(0.05)
+            except Exception:
+                pass
+        inject_text_replacement(self._reword_result)
+        if self._reword_bridge:
+            self._reword_bridge.sig_close.emit()
 
     def apply_chosen_synonym(
         self,
@@ -125,6 +217,8 @@ class AppOrchestrator:
         """Bootstraps all background services, registers shortcuts, and mounts the event bus."""
         session_id = f"session_{uuid.uuid4().hex[:12]}"
         log.info("Initializing Research Aid application session: %s", session_id)
+        # Pre-warmed by main.py; connect GUI signals before worker hotkeys arrive.
+        self._configure_reword_overlay()
 
         # 1. Start daemon supervisor
         daemon_status = self.daemon_supervisor.start(DaemonConfig())
@@ -153,6 +247,15 @@ class AppOrchestrator:
                     "evidence": ActionTrigger.RETRIEVE_EVIDENCE,
                     "source_summary": ActionTrigger.SUMMARIZE_SOURCE,
                 }
+                if event.action == "reword_popup":
+                    payload = extract_selection()
+                    if payload is None or not payload.selected_text or not payload.selected_text.strip():
+                        print("[SELECTION] No text currently highlighted in active window.", flush=True)
+                        return
+                    print(f"[SELECTION] Text: '{payload.selected_text}'", flush=True)
+                    opened = self._open_reword_popup(payload.selected_text, target_hwnd)
+                    print("[STATUS] Opened interactive reword popup." if opened else "[STATUS] Reword popup unavailable.", flush=True)
+                    return
                 trigger = action_map.get(event.action)
                 if trigger:
                     payload = extract_selection()
@@ -258,7 +361,16 @@ class AppOrchestrator:
 
                     def fetch_and_populate():
                         try:
-                            syn_result = _run_async(find_contextual_synonyms(target_word, text, limit=12))
+                            syn_result = _run_async(
+                                find_contextual_synonyms(
+                                    target_word,
+                                    text,
+                                    limit=12,
+                                    stage_callback=lambda stage: bridge.sig_show_filtering.emit()
+                                    if stage == "filtering"
+                                    else None,
+                                )
+                            )
                             candidates = [item.word for item in syn_result.ranked_synonyms[:12]]
                             if not candidates:
                                 candidates = [target_word]
@@ -553,6 +665,13 @@ class AppOrchestrator:
         except Exception:
             pass
 
+        try:
+            bridge = get_reword_overlay_bridge()
+            if bridge:
+                bridge.sig_close.emit()
+        except Exception:
+            pass
+
         self.is_running = False
         elapsed = (time.monotonic() - start_time) * 1000.0
 
@@ -602,4 +721,3 @@ def shutdown_application(
     timeout_ms: int = 3000,
 ) -> AppExitReport:
     return _global_app.shutdown_application(reason, timeout_ms)
-

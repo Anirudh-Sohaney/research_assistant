@@ -3,6 +3,8 @@
 ## Module Overview
 `api_gateway` manages all outbound HTTP requests to academic, lexical, and LLM APIs, handling rate limiting, fault tolerance, caching, and token telemetry.
 
+Each active asyncio event loop receives its own HTTP client. This is required by the desktop orchestrator, which runs repeated background generations in short-lived worker loops; it prevents later requests from failing with `Event loop is closed`.
+
 ## File Structure
 - `models.py`: Data classes (`ExternalService`, `RequestPayload`, `ApiResponse`, `AuthConfig`, `TokenUsageReport`).
 - `gateway.py`: Core gateway implementation containing `TokenBucket`, `CircuitBreaker`, `ResponseCache`, and `ApiGateway`.

@@ -67,6 +67,86 @@ class SciFiScanLine(QtWidgets.QWidget):
         painter.end()
 
 
+class SciFiDictionaryRouteWidget(QtWidgets.QWidget):
+    """Animated route showing the external dictionary candidate lookup."""
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setMinimumHeight(92)
+        self._frame = 0
+        self._timer = QtCore.QTimer(self)
+        self._timer.timeout.connect(self._advance)
+        self._timer.start(55)
+
+    def _advance(self):
+        self._frame = (self._frame + 1) % 48
+        self.update()
+
+    def paintEvent(self, event: QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        width = self.width()
+        y = 38
+        nodes = [(22, "REQ"), (width // 2, "DICT"), (width - 22, "POOL")]
+        painter.setPen(QtGui.QPen(QtGui.QColor("#444444"), 1))
+        painter.drawLine(nodes[0][0], y, nodes[1][0], y)
+        painter.drawLine(nodes[1][0], y, nodes[2][0], y)
+        segment = (self._frame // 24) % 2
+        progress = (self._frame % 24) / 23.0
+        x1, x2 = ((nodes[0][0], nodes[1][0]), (nodes[1][0], nodes[2][0]))[segment]
+        packet_x = x1 + (x2 - x1) * progress
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.setBrush(QtGui.QColor("#FFFFFF"))
+        painter.drawEllipse(QtCore.QPointF(packet_x, y), 4.0, 4.0)
+        for x, label in nodes:
+            painter.setBrush(QtGui.QColor("#0A0A0A"))
+            painter.setPen(QtGui.QPen(QtGui.QColor("#BBBBBB"), 1))
+            painter.drawEllipse(QtCore.QPointF(x, y), 9.0, 9.0)
+            painter.setPen(QtGui.QColor("#DDDDDD"))
+            painter.drawText(QtCore.QRectF(x - 22, y + 18, 44, 16), QtCore.Qt.AlignmentFlag.AlignCenter, label)
+        painter.setPen(QtGui.QColor("#666666"))
+        painter.drawText(0, 12, width, 16, QtCore.Qt.AlignmentFlag.AlignCenter, "EXTERNAL DICTIONARY ROUTE")
+        painter.end()
+
+
+class SciFiFilteringWidget(QtWidgets.QWidget):
+    """Animated semantic-fit filter shown while Ling evaluates candidates."""
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setMinimumHeight(92)
+        self._frame = 0
+        self._timer = QtCore.QTimer(self)
+        self._timer.timeout.connect(self._advance)
+        self._timer.start(70)
+
+    def _advance(self):
+        self._frame = (self._frame + 1) % 36
+        self.update()
+
+    def paintEvent(self, event: QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        width = self.width()
+        painter.setPen(QtGui.QColor("#666666"))
+        painter.drawText(0, 12, width, 16, QtCore.Qt.AlignmentFlag.AlignCenter, "LING // SEMANTIC FILTER")
+        lane_y = [42, 57, 72]
+        lane_width = max(80, width - 42)
+        sweep_x = 18 + (self._frame / 35.0) * lane_width
+        for index, y in enumerate(lane_y):
+            painter.setPen(QtGui.QPen(QtGui.QColor("#3A3A3A"), 2))
+            painter.drawLine(18, y, 18 + lane_width, y)
+            dot_x = 18 + ((self._frame * (index + 2) * 3) % int(lane_width))
+            painter.setPen(QtCore.Qt.PenStyle.NoPen)
+            painter.setBrush(QtGui.QColor("#AAAAAA" if index != 1 else "#FFFFFF"))
+            painter.drawEllipse(QtCore.QPointF(dot_x, y), 3.0, 3.0)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#FFFFFF"), 1))
+        painter.drawLine(QtCore.QPointF(sweep_x, 30), QtCore.QPointF(sweep_x, 82))
+        painter.setPen(QtGui.QColor("#555555"))
+        painter.drawText(0, 84, width, 14, QtCore.Qt.AlignmentFlag.AlignCenter, "CONTEXT FIT / TENSE / REGISTER")
+        painter.end()
+
+
 class SciFiLoadingWidget(QtWidgets.QWidget):
     """Pulsing, high-contrast black & white sci-fi loading view."""
 
@@ -83,7 +163,15 @@ class SciFiLoadingWidget(QtWidgets.QWidget):
         self._dots_label.setStyleSheet("color: #FFFFFF; font-size: 14px; font-weight: bold; background: transparent;")
         layout.addWidget(self._dots_label)
 
-        # Scan line
+        # Stage animation: external dictionary route, then semantic filtering.
+        self._stage_stack = QtWidgets.QStackedWidget()
+        self._dictionary_route = SciFiDictionaryRouteWidget()
+        self._filtering_view = SciFiFilteringWidget()
+        self._stage_stack.addWidget(self._dictionary_route)
+        self._stage_stack.addWidget(self._filtering_view)
+        layout.addWidget(self._stage_stack)
+
+        # Retain the crisp scanner below the route/filter visualization.
         self._scanner = SciFiScanLine()
         layout.addWidget(self._scanner)
 
@@ -97,10 +185,10 @@ class SciFiLoadingWidget(QtWidgets.QWidget):
         layout.addWidget(self._status_label)
 
         # Subtext
-        sub_label = QtWidgets.QLabel("QUERYING NEURAL LEXICON")
-        sub_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        sub_label.setStyleSheet("color: #666666; font-size: 9px; font-family: 'Consolas', monospace; background: transparent;")
-        layout.addWidget(sub_label)
+        self._sub_label = QtWidgets.QLabel("QUERYING EXTERNAL DICTIONARY")
+        self._sub_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._sub_label.setStyleSheet("color: #666666; font-size: 9px; font-family: 'Consolas', monospace; background: transparent;")
+        layout.addWidget(self._sub_label)
 
         self._frame = 0
         self._pulse_timer = QtCore.QTimer(self)
@@ -116,6 +204,17 @@ class SciFiLoadingWidget(QtWidgets.QWidget):
             self._dots_label.setText("○  ●  ○")
         else:
             self._dots_label.setText("○  ○  ●")
+
+
+    def show_dictionary_stage(self):
+        self._stage_stack.setCurrentWidget(self._dictionary_route)
+        self._status_label.setText("HARVESTING CANDIDATES")
+        self._sub_label.setText("QUERYING EXTERNAL DICTIONARY")
+
+    def show_filtering_stage(self):
+        self._stage_stack.setCurrentWidget(self._filtering_view)
+        self._status_label.setText("FILTERING FOR FIT")
+        self._sub_label.setText("LING // CONTEXT + TENSE + REGISTER")
 
 
 class SciFiSynonymListWidget(QtWidgets.QListWidget):
@@ -224,6 +323,10 @@ class PyQtSynonymOverlay(QtWidgets.QWidget):
             | QtCore.Qt.WindowType.Tool
         )
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # This is a modeless utility window.  Closing it must not destroy the
+        # singleton or make QApplication exit when it is the only window.
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_QuitOnClose, False)
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
 
         self._init_ui()
@@ -317,14 +420,20 @@ class PyQtSynonymOverlay(QtWidgets.QWidget):
         self.setGeometry(x, y, width, height)
 
     def show_loading(self, target_word: str):
+        self._loading_widget.show_dictionary_stage()
         """Displays overlay immediately in loading animation state."""
         self._target_label.setText(f'TARGET » "{target_word}"')
         self._stack.setCurrentIndex(0)
         self.position_on_right_edge()
+        self.showNormal()
         self.show()
         self.raise_()
         self.activateWindow()
         self.setFocus()
+
+    def show_filtering(self):
+        """Switches the loading card to the Ling semantic-filter animation."""
+        self._loading_widget.show_filtering_stage()
 
     def show_synonyms(self, target_word: str, synonyms: List[str], on_apply: Optional[Callable[[str], None]] = None):
         """Transitions overlay to loaded state with synonym list."""
@@ -333,6 +442,7 @@ class PyQtSynonymOverlay(QtWidgets.QWidget):
         self._list_widget.populate(synonyms)
         self._stack.setCurrentIndex(1)
         self.position_on_right_edge()
+        self.showNormal()
         self.show()
         self.raise_()
         self.activateWindow()
@@ -375,20 +485,30 @@ class PyQtSynonymOverlay(QtWidgets.QWidget):
 
         super().keyPressEvent(event)
 
+    def closeEvent(self, event: QtGui.QCloseEvent):
+        """Keep the reusable overlay alive; user cancellation is handled by Esc."""
+        if self._allow_auto_hide:
+            event.accept()
+        else:
+            event.ignore()
+
 
 class SynonymOverlayBridge(QtCore.QObject):
     """Thread-safe signal dispatcher for cross-thread PyQt GUI invocations."""
 
     sig_show_loading = QtCore.pyqtSignal(str)
+    sig_show_filtering = QtCore.pyqtSignal()
     sig_show_synonyms = QtCore.pyqtSignal(str, list, object)
     sig_close = QtCore.pyqtSignal()
 
     def __init__(self, overlay: PyQtSynonymOverlay):
         super().__init__()
         self.overlay = overlay
-        self.sig_show_loading.connect(self.overlay.show_loading)
-        self.sig_show_synonyms.connect(self.overlay.show_synonyms)
-        self.sig_close.connect(self.overlay.hide)
+        queued = QtCore.Qt.ConnectionType.QueuedConnection
+        self.sig_show_loading.connect(self.overlay.show_loading, queued)
+        self.sig_show_filtering.connect(self.overlay.show_filtering, queued)
+        self.sig_show_synonyms.connect(self.overlay.show_synonyms, queued)
+        self.sig_close.connect(self.overlay.hide, queued)
 
 
 # Global singleton instance holder
@@ -401,7 +521,13 @@ def get_synonym_overlay_bridge() -> Optional[SynonymOverlayBridge]:
     global _GLOBAL_OVERLAY, _GLOBAL_BRIDGE
     if _GLOBAL_BRIDGE is None:
         app = QtWidgets.QApplication.instance()
-        if app is not None:
-            _GLOBAL_OVERLAY = PyQtSynonymOverlay()
-            _GLOBAL_BRIDGE = SynonymOverlayBridge(_GLOBAL_OVERLAY)
+        if app is None:
+            return None
+        # QWidget construction is GUI-thread-only.  The hotkey callback runs
+        # on a worker thread, so it must never lazily create this singleton.
+        if QtCore.QThread.currentThread() != app.thread():
+            log.warning("Synonym overlay requested before GUI-thread initialization")
+            return None
+        _GLOBAL_OVERLAY = PyQtSynonymOverlay()
+        _GLOBAL_BRIDGE = SynonymOverlayBridge(_GLOBAL_OVERLAY)
     return _GLOBAL_BRIDGE

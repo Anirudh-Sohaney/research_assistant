@@ -43,20 +43,26 @@ class TestEntityShielding:
         assert "__CITE" not in restored
         assert "__MATH" not in restored
 
+    def test_structured_response_parser_accepts_fenced_json(self):
+        parsed = TextRewordEngine._parse_structured_response(
+            'Here is the result:\n```json\n{"primary":"The result was confirmed.","variants":[]}\n```'
+        )
+        assert parsed["primary"] == "The result was confirmed."
+
 
 @pytest.mark.asyncio
 class TestRewordExecution:
-    async def test_offline_fallback_academic_enhancement(self):
+    @patch("text_reword.reword.query_semantic_cache", return_value=None)
+    @patch("text_reword.reword.dispatch_api_request")
+    async def test_llm_only_reports_unavailable_service(self, mock_dispatch, mock_cache):
+        mock_dispatch.return_value = ApiResponse(status_code=503, data=None, latency_ms=0.0, error="offline")
         engine = TextRewordEngine()
         sentence = "We need to look into a lot of options (Smith, 2021) to make sure this works."
         result = await engine.reword_text_segment(sentence, style=RewordStyle.ACADEMIC_FORMAL)
 
         assert isinstance(result, RewordResult)
-        assert "(Smith, 2021)" in result.primary_replacement
-        # Colloquial phrases replaced
-        assert "investigate" in result.primary_replacement.lower()
-        assert "substantial" in result.primary_replacement.lower()
-        assert "ensure" in result.primary_replacement.lower()
+        assert result.primary_replacement == ""
+        assert result.error == "OpenRouter did not return a usable rewording."
 
     @patch("text_reword.reword.query_semantic_cache", return_value=None)
     @patch("text_reword.reword.dispatch_api_request")
@@ -85,3 +91,20 @@ class TestRewordExecution:
         assert "(Smith et al., 2022)" in result.primary_replacement
         assert len(result.alternative_variants) == 2
         assert all("(Smith et al., 2022)" in v for v in result.alternative_variants)
+
+    @patch("text_reword.reword.query_semantic_cache", return_value=None)
+    @patch("text_reword.reword.dispatch_api_request")
+    async def test_ling_model_and_explicit_mode_prompt(self, mock_dispatch, mock_cache):
+        mock_dispatch.return_value = ApiResponse(
+            status_code=200,
+            data={"choices": [{"message": {"content": '{"primary":"The experiments demonstrate robust results.","variants":[]}'}}]},
+            latency_ms=20.0,
+            tokens_consumed=12,
+        )
+        await reword_text_segment(
+            "The experiments show good results.",
+            style=RewordStyle.EXPANDED_ARGUMENT,
+        )
+        payload = mock_dispatch.call_args.args[2]
+        assert payload.json_body["model"] == "nvidia/nemotron-3-ultra-550b-a55b:free"
+        assert "add useful detail" in payload.json_body["messages"][0]["content"]

@@ -3,6 +3,8 @@
 ## Module Overview
 `lexical_synonyms` discovers, inflects, and ranks contextually accurate academic synonyms for highlighted words using a simplified dictionary harvesting + spaCy morphological inflection + SentenceTransformer contextual re-ranking pipeline.
 
+The pipeline first queries the external Datamuse dictionary for a broad candidate pool. OpenRouter/Ling then filters those candidates against the complete sentence and can return grammatically inflected forms (such as past, present, or future-compatible replacements). If the cloud call is unavailable, local Qwen and deterministic dictionary ranking provide graceful fallbacks. The frontend consumes the returned ranked list asynchronously. This module does not create, show, hide, or otherwise control the PyQt6 popup.
+
 ## File Structure
 - `models.py`: Data classes (`RawCandidate`, `SynonymItem`, `SynonymGroupResult`).
 - `synonyms.py`: Harvester and ranker implementation with built-in AWL registry, offline fallback dictionaries, irregular verb tables, spaCy tense aligner, and SentenceTransformer scorer.

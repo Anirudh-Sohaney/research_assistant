@@ -336,4 +336,44 @@ class TestFullPipeline:
         assert isinstance(res, SynonymGroupResult)
         assert len(res.ranked_synonyms) > 0
 
+    @patch("lexical_synonyms.synonyms.dispatch_api_request")
+    async def test_external_candidates_are_passed_to_llm_for_filtering_and_inflection(self, mock_dispatch):
+        """Datamuse supplies the pool; Ling selects sentence-fitting inflected forms."""
+        import json
 
+        dictionary_response = ApiResponse(
+            status_code=200,
+            data=[
+                {"word": "document", "tags": ["v", "f:30.0"]},
+                {"word": "note", "tags": ["v", "f:25.0"]},
+                {"word": "observe", "tags": ["v", "f:20.0"]},
+            ],
+            latency_ms=5.0,
+        )
+        llm_response = ApiResponse(
+            status_code=200,
+            data={
+                "choices": [{"message": {"content": json.dumps(["documented", "noted"])}}],
+            },
+            latency_ms=20.0,
+        )
+
+        async def fake_dispatch(service, endpoint, payload):
+            if service.value == "DATAMUSE":
+                return dictionary_response
+            return llm_response
+
+        mock_dispatch.side_effect = fake_dispatch
+        engine = LexicalSynonymsEngine()
+        result = await engine.find_contextual_synonyms(
+            target_word="observed",
+            sentence_context="The study observed a significant effect.",
+            limit=5,
+            use_llm=True,
+        )
+
+        llm_call = next(call for call in mock_dispatch.call_args_list if call.kwargs["service"].value == "LLM_SERVICE")
+        prompt = llm_call.kwargs["payload"].json_body["messages"][1]["content"]
+        assert "document" in prompt
+        assert "note" in prompt
+        assert [item.word for item in result.ranked_synonyms] == ["documented", "noted"]

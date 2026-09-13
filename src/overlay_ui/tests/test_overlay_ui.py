@@ -153,12 +153,21 @@ def test_pyqt_synonym_overlay_full_flow():
 
     # 1. Loading signal
     bridge.sig_show_loading.emit("analyze")
+    app.processEvents()
     assert overlay.isVisible()
     assert overlay._stack.currentIndex() == 0
+    assert overlay._loading_widget._stage_stack.currentIndex() == 0
+
+    # 1b. Candidate harvest completed; show Ling's semantic filtering phase.
+    bridge.sig_show_filtering.emit()
+    app.processEvents()
+    assert overlay._loading_widget._stage_stack.currentIndex() == 1
+    assert overlay._loading_widget._status_label.text() == "FILTERING FOR FIT"
 
     applied_words = []
     # 2. Show synonyms signal
     bridge.sig_show_synonyms.emit("analyze", ["examine", "investigate", "evaluate"], lambda w: applied_words.append(w))
+    app.processEvents()
     assert overlay._stack.currentIndex() == 1
     assert overlay._list_widget.count() == 3
 
@@ -176,4 +185,24 @@ def test_pyqt_synonym_overlay_full_flow():
     overlay.show()
     assert overlay.isVisible()
     bridge.sig_close.emit()
+    app.processEvents()
     assert not overlay.isVisible()
+
+
+def test_pyqt_synonym_overlay_is_reusable_after_close_request():
+    from PyQt6 import QtCore, QtWidgets
+    from overlay_ui.pyqt_synonym_overlay import PyQtSynonymOverlay
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    overlay = PyQtSynonymOverlay()
+    overlay.show_loading("robust")
+    app.processEvents()
+    overlay.close()
+    app.processEvents()
+
+    # A window-manager close must not destroy the singleton or make it vanish.
+    assert not overlay.testAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose)
+    overlay.show_loading("robust")
+    app.processEvents()
+    assert overlay.isVisible()
+    overlay.hide()

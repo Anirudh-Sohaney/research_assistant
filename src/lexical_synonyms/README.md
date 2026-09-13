@@ -7,6 +7,8 @@ A high-precision academic synonym discovery and contextual ranking engine (`lexi
 - **Candidate Synonym Harvesting Fallback (`harvest_candidate_synonyms()`)**: Multi-source dictionary harvesting via Datamuse REST API (`rel_syn`, `rel_spc`, `ml` with strict `syn` tag validation) and offline fallback lexicons.
 - **Contextual and Scholarly Register Re-Ranking (`rank_candidates_in_context()`)**: Evaluates morphological alignment, SentenceTransformer cosine similarity, and Academic Word List (AWL) fitness.
 - **Top-1 Selection & Cycling Pipeline**: Automatically provides candidates for immediate word substitution and stationary cursor synonym cycling.
+- **Two-stage synonym pipeline**: Datamuse is queried first through the external API gateway to harvest a broad candidate pool. OpenRouter/Ling then filters that pool against the full sentence and may inflect candidates to preserve tense, aspect, number, and agreement. If the cloud model is unavailable, local Qwen and deterministic dictionary ranking remain available.
+- **Frontend handoff**: The ranked candidate list is passed to the PyQt6 overlay asynchronously; synonym generation remains independent of popup lifecycle and editor injection.
 
 ## 2. Algorithm Used
 **Multi-Tier Contextual Academic Synonym Architecture**:
@@ -34,4 +36,3 @@ A high-precision academic synonym discovery and contextual ranking engine (`lexi
 
 ## 3. Description
 The `lexical_synonyms` subsystem enables researchers and essay writers in Word, Google Docs, and LaTeX to discover and substitute high-precision academic vocabulary with fast local inference, perfect tense preservation, and zero LLM token consumption.
-

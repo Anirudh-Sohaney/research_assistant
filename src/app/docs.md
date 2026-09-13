@@ -49,13 +49,16 @@ The `app` module orchestrates all underlying subsystems into a cohesive backgrou
 Initializes the daemon supervisor, hotkey manager, and all subsystems, returning the active runtime context.
 
 ### `dispatch_action_pipeline(action: ActionTrigger, context: SelectionPayload, anchor_rect: Optional[ScreenRect] = None) -> ActionResult`
-Ingests selected text and hovered word, triggers the PyQt6 Sci-Fi right-edge overlay in loading state, asynchronously populates candidates, and attaches the apply callback.
+Ingests selected text and hovered word, triggers the PyQt6 Sci-Fi right-edge overlay in loading state, asynchronously populates candidates, and attaches the apply callback. The overlay bridge is initialized on the GUI thread and receives worker results through queued signals so the popup remains visible instead of flashing away.
 
 ### `apply_chosen_synonym(chosen_word: str, target_word: str, original_text: str, cursor_pos: Optional[Tuple[int, int]] = None, target_hwnd: Optional[int] = None, is_hovered: bool = False) -> str`
 Formats the selected replacement with original casing and trailing space, refocuses the original document window, and replaces text in-place.
 
 ### `shutdown_application(reason: ShutdownReason = ShutdownReason.USER_QUIT, timeout_ms: int = 3000) -> AppExitReport`
 Safely stops keyboard listeners, closes the PyQt overlay and floating cards, and terminates daemon services.
+
+### Interactive full reword (`Alt` + `P`)
+The hotkey opens a PyQt mode picker for **Reword**, **Add Detail**, and **Simplify**. The selected text is sent to OpenRouter/Ling with the corresponding editorial instruction. The generated replacement is previewed in the popup; <kbd>Enter</kbd> injects it into the original editor selection, <kbd>R</kbd> requests a fresh generation, and <kbd>Esc</kbd> cancels.
 
 ---
 

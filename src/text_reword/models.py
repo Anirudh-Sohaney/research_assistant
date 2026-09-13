@@ -37,3 +37,4 @@ class RewordResult:
     tokens_used: int = 0
     style_applied: str = "ACADEMIC_FORMAL"
     cached: bool = False
+    error: Optional[str] = None

@@ -27,6 +27,7 @@ The `overlay_ui` package provides cursor-anchored, non-intrusive floating card i
     - <kbd>Esc</kbd>: Immediately hides the window.
 - **`SynonymOverlayBridge`**:
   - Thread-safe signal dispatcher (`sig_show_loading`, `sig_show_synonyms`, `sig_close`) enabling worker threads to command the Qt GUI thread seamlessly.
+  - The bridge is created only from the Qt GUI thread; `sig_*` connections are explicitly queued. This prevents a hotkey worker from constructing or manipulating a `QWidget`, which previously could cause a popup to flash and disappear.
 
 ### 2. Cursor-Anchored Card Models (`overlay_ui.models`)
 - **`CardType`**: Enum representing active card domains (`DEFINITION`, `SYNONYMS`, `EVIDENCE_STANCE`, `SIMILAR_PAPERS`, `SOURCE_SUMMARY`, `GRAPH_PREVIEW`).
@@ -41,7 +42,7 @@ The `overlay_ui` package provides cursor-anchored, non-intrusive floating card i
 ## API Reference
 
 ### `get_synonym_overlay_bridge() -> Optional[SynonymOverlayBridge]`
-Returns the global thread-safe bridge to control the PyQt6 Sci-Fi Synonym Overlay.
+Returns the global thread-safe bridge to control the PyQt6 Sci-Fi Synonym Overlay. The application initializes it after creating `QApplication`; callers from worker threads must use the returned signals and must not construct the overlay directly.
 
 ### `display_popup_card(payload: PopupCardPayload, anchor_bounds: ScreenRect, screen_size=None, on_action=None) -> PopupHandle`
 Computes clamped coordinates and activates the floating popup card adjacent to the anchor rectangle.

@@ -10,6 +10,8 @@ A non-intrusive visual overlay management subsystem providing:
     - <kbd>Enter</kbd> to apply the chosen candidate in-place into the active word processor / editor.
     - <kbd>Esc</kbd> to cancel and immediately dismiss the popup.
   - **Thread-Safe Cross-Thread Bridge** (`overlay_ui.pyqt_synonym_overlay.SynonymOverlayBridge`):
+    - Must be initialized on the Qt GUI thread (the application entry point pre-warms it before hotkey listeners start).
+    - Worker-thread requests are delivered through queued Qt signals, so widget operations remain on the GUI thread.
     - Connects background hotkey and inference threads to the Qt GUI thread via `pyqtSignal` queued connections.
 - **Cursor-Anchored Popups** (`overlay_ui.overlay.OverlayUIManager`):
   - Floating popup card display anchored to active selection coordinates (`display_popup_card`).
@@ -33,6 +35,7 @@ A non-intrusive visual overlay management subsystem providing:
   2. Background thread queries OpenRouter / dictionary -> on completion emits `sig_show_synonyms(target_word, candidate_words, on_apply)`.
   3. Stack widget switches to page 1 (`SciFiSynonymListWidget`) and focuses the list.
   4. Selection event (<kbd>Enter</kbd>) hides overlay and restores foreground focus to the editor to inject replacement text.
+  5. The reusable overlay ignores accidental window-manager close events and can be shown again for the next request.
 
 ## 3. Description
 The `overlay_ui` subsystem is the visual companion layer for the research assistant. It renders minimalist, black-and-white, sci-fi overlays and floating cards for lexical synonym replacement, definitions, paper recommendations, and summaries. Its clean, frameless, translucent aesthetic ensures zero distraction while authoring research papers in Word, Google Docs, VS Code, or LaTeX.

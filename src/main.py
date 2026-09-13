@@ -13,6 +13,7 @@ from PyQt6 import QtCore, QtWidgets
 from app import init_application, shutdown_application
 from app.models import ShutdownReason
 from overlay_ui import get_synonym_overlay_bridge
+from overlay_ui.reword_overlay import get_reword_overlay_bridge
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,9 +31,11 @@ def main():
     qt_app = QtWidgets.QApplication.instance()
     if qt_app is None:
         qt_app = QtWidgets.QApplication(sys.argv)
+    qt_app.setQuitOnLastWindowClosed(False)
 
     # Pre-warm PyQt Sci-Fi Synonym Overlay & Bridge
     bridge = get_synonym_overlay_bridge()
+    get_reword_overlay_bridge()
 
     context = init_application()
     print(f"Session ID  : {context.session_id}")
@@ -43,7 +46,8 @@ def main():
     print("  * Synonyms       : Alt + O (Sci-Fi right-edge popup; Up/Down to navigate, Enter to apply, Esc to cancel)")
     print("  * Definitions    : Ctrl + Shift + D")
     print("  * Table to Graph : Ctrl + Shift + G")
-    print("  * Reword Text    : Ctrl + Shift + R")
+    print("  * Full Reword    : Alt + P (choose Reword, Add Detail, or Simplify; Enter applies, R regenerates)")
+    print("  * Quick Reword   : Ctrl + Shift + R")
     print("  * Discover Papers: Ctrl + Shift + P")
     print("  * Verify Evidence: Ctrl + Shift + E")
     print("  * Source Summary : Ctrl + Shift + U")

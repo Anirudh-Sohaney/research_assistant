@@ -9,7 +9,7 @@ import math
 import os
 import re
 import time
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from api_gateway.models import ExternalService, RequestPayload
 from api_gateway.gateway import dispatch_api_request
@@ -466,9 +466,14 @@ class LexicalSynonymsEngine:
         return ranked
 
     async def _generate_openrouter_synonyms(
-        self, target_word: str, sentence_context: str, pos_hint: str = "", limit: int = 12
+        self,
+        target_word: str,
+        sentence_context: str,
+        pos_hint: str = "",
+        limit: int = 12,
+        candidate_words: Optional[List[str]] = None,
     ) -> List[str]:
-        """Queries OpenRouter using model 'inclusionai/ling-3.0-flash-vl:free' to generate 8-12 academic synonyms.
+        """Uses Ling on OpenRouter to filter and grammatically adapt dictionary candidates.
 
         ========================================================================
         OPENROUTER INTEGRATION DETAILS:
@@ -476,8 +481,10 @@ class LexicalSynonymsEngine:
         1. Model Selection: Uses 'inclusionai/ling-3.0-flash-vl:free' (configurable via
            OPENROUTER_SYNONYM_MODEL env var) via OpenRouter API (https://openrouter.ai/api/v1).
         2. Prompt Design & Reasoning Budget:
-           - Prompt supplies the target word, sentence context, and morphological part-of-speech
-             rules to enforce exact grammatical agreement when substituted into the sentence.
+           - Prompt supplies the target word, sentence context, candidate pool, and morphological
+             part-of-speech rules. Ling must select the best candidates for the sentence and may
+             inflect a candidate (for example, ``study`` -> ``studied``) to preserve tense,
+             aspect, number, and agreement.
            - max_tokens=450: Sufficient token budget to accommodate model reasoning traces
              plus the full 8-12 word JSON array.
            - 15.0s network timeout: Enforces desktop responsiveness.
@@ -497,18 +504,23 @@ class LexicalSynonymsEngine:
             else "- Maintain the exact same grammatical tense, aspect, number, and part-of-speech as the target word.\n"
         )
 
+        candidate_pool = [w.strip() for w in (candidate_words or []) if w and w.strip()]
+        candidate_line = ", ".join(dict.fromkeys(candidate_pool)) or "(no external candidates available)"
         prompt = (
             f"Target word: \"{clean_target}\"\n"
             f"{pos_line}"
             f"Sentence: \"{sentence_context}\"\n\n"
-            f"Provide 8 to 12 of the best academic, scholarly synonyms for the target word in this specific sentence context.\n"
+            f"External dictionary candidate pool: [{candidate_line}]\n\n"
+            f"Select up to {limit} of the best academic, scholarly synonyms from the candidate pool for this specific sentence context.\n"
             f"Rules:\n"
             f"{pos_rule}"
-            f"- Each synonym must be a single word that directly replaces the target word in the sentence.\n"
+            f"- Prefer candidates from the pool; do not introduce unrelated words.\n"
+            f"- You may inflect a candidate so it directly replaces the target word while preserving tense, aspect, number, and agreement.\n"
+            f"- Each result must be a single word that directly replaces the target word in the sentence.\n"
             f"- Must make clear grammatical sense when directly substituted into the sentence.\n"
             f"- Use rigorous, scholarly academic vocabulary.\n"
             f"- Do NOT include antonyms or colloquial words.\n"
-            f"- Output ONLY a JSON array of 8 to 12 words, e.g. [\"word1\", \"word2\", ...]."
+            f"- Output ONLY a JSON array of up to {limit} words, e.g. [\"word1\", \"word2\", ...]."
         )
 
         messages = [
@@ -644,10 +656,14 @@ class LexicalSynonymsEngine:
         return self._generate_qwen_synonyms(target_word, sentence_context, pos_hint=pos_hint, limit=limit)
 
     async def find_contextual_synonyms(
-        self, target_word: str, sentence_context: str, limit: int = 12, use_llm: bool = True
+        self,
+        target_word: str,
+        sentence_context: str,
+        limit: int = 12,
+        use_llm: bool = True,
+        stage_callback: Optional[Callable[[str], None]] = None,
     ) -> SynonymGroupResult:
-        """Finds contextually accurate academic synonyms using OpenAI gpt-5.6-luna (low reasoning, max speed)
-        with graceful fallback to local Qwen2.5-1.5B and dictionary + sentence transformer."""
+        """Finds synonyms by harvesting externally, then filtering with Ling and local fallbacks."""
         t0 = time.monotonic()
         clean_target = target_word.strip().lower()
 
@@ -674,12 +690,22 @@ class LexicalSynonymsEngine:
         elif pos in ("NOUN", "PROPN") or tag.startswith("NN"):
             pos_hint = "plural noun" if tag == "NNS" else "noun"
 
-        # 2. Attempt generation with OpenRouter inclusionai/ling-3.0-flash-vl:free
+        # 2. Harvest a broad external candidate pool before asking the LLM to filter it.
+        raw_candidates = await self.harvest_candidate_synonyms(clean_target, lemma=lemma, pos=pos)
+        candidate_words = [candidate.word for candidate in raw_candidates]
+
+        # 3. Ask OpenRouter/Ling to select candidates that fit the whole sentence and inflect them.
         if use_llm:
+            if stage_callback:
+                stage_callback("filtering")
             req_limit = max(12, limit)
             # Primary: OpenRouter inclusionai/ling-3.0-flash-vl:free
             llm_words = await self._generate_openrouter_synonyms(
-                target_word, sentence_context, pos_hint=pos_hint, limit=req_limit
+                target_word,
+                sentence_context,
+                pos_hint=pos_hint,
+                limit=req_limit,
+                candidate_words=candidate_words,
             )
 
             # Secondary fallback: Local Qwen2.5-1.5B instruction-tuned model if cloud API unavailable
@@ -714,19 +740,7 @@ class LexicalSynonymsEngine:
                     inference_latency_ms=latency_ms,
                 )
 
-        # 3. Fallback to simplified 2-stage dictionary harvesting + SentenceTransformer ranking
-        # Parse target word within sentence context using spaCy
-        nlp = _get_nlp()
-        doc = nlp(sentence_context) if nlp else None
-        target_token = next((t for t in doc if t.text.lower() == clean_target), None) if doc else None
-        tag = target_token.tag_ if target_token else ""
-        pos = target_token.pos_ if target_token else ""
-        lemma = target_token.lemma_.lower() if target_token else clean_target
-
-        # Harvest raw candidate synonyms from Datamuse dictionary
-        raw_candidates = await self.harvest_candidate_synonyms(clean_target, lemma=lemma, pos=pos)
-
-        # 3. Enforce bidirectional grammatical tense & part-of-speech agreement
+        # 4. Fallback to dictionary candidates + deterministic grammatical alignment.
         aligned_candidates: List[RawCandidate] = []
         seen: Set[str] = set()
 
@@ -823,9 +837,19 @@ _global_engine = LexicalSynonymsEngine()
 
 
 async def find_contextual_synonyms(
-    target_word: str, sentence_context: str, limit: int = 12, use_llm: bool = True
+    target_word: str,
+    sentence_context: str,
+    limit: int = 12,
+    use_llm: bool = True,
+    stage_callback: Optional[Callable[[str], None]] = None,
 ) -> SynonymGroupResult:
-    return await _global_engine.find_contextual_synonyms(target_word, sentence_context, limit, use_llm=use_llm)
+    return await _global_engine.find_contextual_synonyms(
+        target_word,
+        sentence_context,
+        limit,
+        use_llm=use_llm,
+        stage_callback=stage_callback,
+    )
 
 
 async def harvest_candidate_synonyms(
