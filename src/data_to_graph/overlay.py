@@ -218,7 +218,7 @@ class TableGraphOverlay(QtWidgets.QWidget):
         chart_page_layout.setSpacing(6)
 
         self._image_frame = QtWidgets.QFrame()
-        self._image_frame.setStyleSheet("QFrame { background:#111; border:1px solid #222; border-radius:8px; }")
+        self._image_frame.setStyleSheet("QFrame { background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; }")
         img_layout = QtWidgets.QVBoxLayout(self._image_frame)
         img_layout.setContentsMargins(6, 6, 6, 6)
 
@@ -231,36 +231,24 @@ class TableGraphOverlay(QtWidgets.QWidget):
 
         # Meta detail strip
         self._meta_label = QtWidgets.QLabel("READY")
-        self._meta_label.setStyleSheet("color:#666; font:9px Consolas; background:transparent;")
+        self._meta_label.setStyleSheet("color:#888; font:9px Consolas; background:transparent;")
         chart_page_layout.addWidget(self._meta_label)
 
-        # Paste action button bar: Paste Graph Below vs Paste Table + Graph
-        btn_bar = QtWidgets.QHBoxLayout()
-        btn_bar.setSpacing(8)
-
-        self._paste_button = QtWidgets.QPushButton("↵  PASTE GRAPH BELOW  [ENTER]")
-        self._paste_button.setMinimumHeight(38)
-        self._paste_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self._paste_button.setStyleSheet(
-            "QPushButton { color:#000; background:#FFF; border:1px solid #FFF; border-radius:7px; font: bold 11px Consolas; padding:6px; }"
-            "QPushButton:hover { background:#DDD; }"
-            "QPushButton:pressed { background:#BBB; }"
+        # Prominent single action button: Copy to Clipboard across all formats
+        self._copy_button = QtWidgets.QPushButton("📋  COPY TO CLIPBOARD  [ENTER]")
+        self._copy_button.setMinimumHeight(40)
+        self._copy_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self._copy_button.setStyleSheet(
+            "QPushButton { color:#000000; background:#FFFFFF; border:1px solid #FFFFFF; border-radius:7px; font: bold 11px Consolas; padding:8px; }"
+            "QPushButton:hover { background:#E2E8F0; }"
+            "QPushButton:pressed { background:#CBD5E1; }"
         )
-        self._paste_button.clicked.connect(self.paste_chart_below_table)
-        btn_bar.addWidget(self._paste_button, 3)
+        self._copy_button.clicked.connect(self.paste_chart_below_table)
+        chart_page_layout.addWidget(self._copy_button)
 
-        self._paste_both_button = QtWidgets.QPushButton("📋  TABLE + GRAPH  [SHIFT+ENTER]")
-        self._paste_both_button.setMinimumHeight(38)
-        self._paste_both_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self._paste_both_button.setStyleSheet(
-            "QPushButton { color:#FFF; background:#1A1A1A; border:1px solid #444; border-radius:7px; font: bold 10px Consolas; padding:6px; }"
-            "QPushButton:hover { background:#2A2A2A; border-color:#666; }"
-            "QPushButton:pressed { background:#111; }"
-        )
-        self._paste_both_button.clicked.connect(self.paste_table_and_chart)
-        btn_bar.addWidget(self._paste_both_button, 2)
-
-        chart_page_layout.addLayout(btn_bar)
+        # Maintain aliases for programmatic / test compatibility
+        self._paste_button = self._copy_button
+        self._paste_both_button = self._copy_button
 
         self._stack.addWidget(self._chart_page)
 
@@ -273,7 +261,7 @@ class TableGraphOverlay(QtWidgets.QWidget):
         layout.addWidget(self._stack, 1)
 
         # Footer guidance
-        self._footer = QtWidgets.QLabel("[ENTER] PASTE GRAPH BELOW   [SHIFT+ENTER] TABLE + GRAPH   [1-9 / TAB] TYPE   [C] COPY   [ESC] CANCEL")
+        self._footer = QtWidgets.QLabel("[ENTER] COPY TO CLIPBOARD   [1-9 / TAB] CHANGE CHART   [←/→] DATASETS   [ESC] CANCEL")
         self._footer.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._footer.setStyleSheet("color:#666; font:8px Consolas; background:transparent;")
         layout.addWidget(self._footer)
@@ -386,8 +374,8 @@ class TableGraphOverlay(QtWidgets.QWidget):
         # Render dataset buttons if multiple datasets exist
         self._update_dataset_buttons()
 
-        # Generate primary chart for this dataset
-        style = ChartStyleConfig(dark_mode=True, figure_size=(6.0, 3.8))
+        # Generate primary chart for this dataset with clean white theme
+        style = ChartStyleConfig(dark_mode=False, figure_size=(6.2, 3.8), title=clean_heading)
         self._current_chart = self._engine.generate_chart(ds, chart_type=ds.suggested_chart_type, style=style)
         self._render_current_chart()
 
@@ -589,7 +577,7 @@ class TableGraphOverlay(QtWidgets.QWidget):
         # 4. Show instant non-intrusive floating confirmation toast
         self._show_toast(
             "✓ FIGURE COPIED TO CLIPBOARD",
-            "Pasting below table... Press [Ctrl+V] anytime in any app.",
+            "Ready to paste with [Ctrl+V] into any application.",
         )
 
         # 5. Restore target application and paste below table

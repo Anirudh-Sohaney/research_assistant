@@ -12,8 +12,20 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 matplotlib.use("Agg")
+import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Configure modern, aesthetic sans-serif typography across all charts
+matplotlib.rcParams["font.sans-serif"] = [
+    "Segoe UI", "Inter", "Arial", "Helvetica Neue", "DejaVu Sans"
+]
+matplotlib.rcParams["font.family"] = "sans-serif"
+matplotlib.rcParams["axes.edgecolor"] = "#CBD5E1"
+matplotlib.rcParams["axes.linewidth"] = 0.8
+matplotlib.rcParams["grid.color"] = "#F1F5F9"
+matplotlib.rcParams["grid.linestyle"] = "--"
+matplotlib.rcParams["grid.alpha"] = 0.8
 
 from data_to_graph.models import (
     ChartStyleConfig,
@@ -24,13 +36,13 @@ from data_to_graph.models import (
 
 log = logging.getLogger("data_to_graph")
 
-# Scholarly Palettes (High-contrast, publication-grade)
+# Scholarly Palettes (High-contrast, publication-grade on white background)
 PALETTES: Dict[str, List[str]] = {
-    "academic": ["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f"],
-    "colorblind": ["#0072B2", "#D55E00", "#009E73", "#F0E442", "#CC79A7", "#56B4E9", "#E69F00", "#000000"],
-    "scifi": ["#00E5FF", "#FF0055", "#00FF66", "#FFEA00", "#D500F9", "#76FF03", "#E040FB", "#FF6D00"],
-    "grayscale": ["#1A1A1A", "#4A4A4A", "#7A7A7A", "#A0A0A0", "#C5C5C5", "#E0E0E0"],
-    "seaborn": ["#2B5C8F", "#D95F02", "#7570B3", "#1B9E77", "#E7298A", "#66A61E", "#E6AB02"],
+    "academic": ["#2563EB", "#DC2626", "#059669", "#D97706", "#7C3AED", "#0891B2", "#DB2777", "#475569"],
+    "colorblind": ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#56B4E9", "#CC79A7", "#F0E442", "#000000"],
+    "scifi": ["#0284C7", "#E11D48", "#059669", "#D97706", "#7C3AED", "#2563EB", "#0D9488", "#EA580C"],
+    "grayscale": ["#0F172A", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1"],
+    "seaborn": ["#1D4ED8", "#EA580C", "#6D28D9", "#047857", "#BE185D", "#4D7C0F", "#B45309"],
 }
 
 # Common units stripped from cell numbers (matches both "12ms" and "12 ms")
@@ -454,21 +466,22 @@ class TableGraphEngine:
         fig_size = getattr(cfg, "figure_size", (6.5, 4.0))
         fig, ax = plt.subplots(figsize=fig_size, dpi=cfg.dpi)
 
-        is_dark = getattr(cfg, "dark_mode", False)
-        bg_color = "#121212" if is_dark else "white"
-        ax_bg_color = "#1E1E1E" if is_dark else "#FAFAFA"
-        text_color = "#E0E0E0" if is_dark else "#222222"
-        grid_color = "#333333" if is_dark else "#E5E5E5"
-        spine_color = "#555555" if is_dark else "#888888"
+        # Theme: strictly maintain clean publication-grade white background
+        is_dark = False
+        bg_color = "white"
+        ax_bg_color = "white"
+        text_color = "#0F172A"
+        grid_color = "#F1F5F9"
+        spine_color = "#CBD5E1"
 
         fig.patch.set_facecolor(bg_color)
         ax.set_facecolor(ax_bg_color)
         if getattr(cfg, "show_grid", True):
-            ax.grid(True, linestyle="--", alpha=0.6, color=grid_color, zorder=0)
+            ax.grid(True, linestyle="--", alpha=0.8, color=grid_color, zorder=0)
 
         palette_key = getattr(cfg, "palette", "academic")
         if palette_key not in PALETTES:
-            palette_key = "scifi" if is_dark else "academic"
+            palette_key = "academic"
         colors = PALETTES[palette_key]
 
         cat_cols = [c for c, t in dataset.column_types.items() if t == "CATEGORICAL"]
@@ -543,7 +556,7 @@ class TableGraphEngine:
                     for bar in bars:
                         h = bar.get_height()
                         if not math.isnan(h) and abs(h) > 0.001:
-                            val_str = f"{h:.1f}" if isinstance(h, float) and not h.is_integer() else f"{int(h)}"
+                            val_str = f"{int(h):,}" if float(h).is_integer() else f"{h:,.1f}"
                             va = "bottom" if h >= 0 else "top"
                             ax.annotate(
                                 val_str,
@@ -552,7 +565,8 @@ class TableGraphEngine:
                                 textcoords="offset points",
                                 ha="center",
                                 va=va,
-                                fontsize=7.5,
+                                fontsize=8,
+                                fontweight="bold",
                                 color=text_color,
                             )
 
@@ -584,7 +598,7 @@ class TableGraphEngine:
             )
             max_v = max(y_vals) if y_vals and max(y_vals) > 0 else 1.0
             for i, v in enumerate(y_vals):
-                val_str = f"{v:.1f}" if isinstance(v, float) and not v.is_integer() else f"{int(v)}"
+                val_str = f"{int(v):,}" if float(v).is_integer() else f"{v:,.1f}"
                 ax.text(v + (max_v * 0.015), y_pos[i], f" {val_str}", va="center", ha="left", color=text_color, fontsize=8, fontweight="bold")
             ax.set_xlim(0, max_v * 1.15 if max_v > 0 else 1.0)
 
@@ -620,8 +634,8 @@ class TableGraphEngine:
                     ax.fill_between(x_plot, y_plot, alpha=0.15, color=color, zorder=2)
                     if len(x_plot) <= 10:
                         for px, py in zip(x_plot, y_plot):
-                            v_str = f"{py:.1f}" if isinstance(py, float) and not py.is_integer() else f"{int(py)}"
-                            ax.annotate(v_str, (px, py), xytext=(0, 5), textcoords="offset points", ha="center", fontsize=7.5, color=text_color, fontweight="bold")
+                            v_str = f"{int(py):,}" if float(py).is_integer() else f"{py:,.1f}"
+                            ax.annotate(v_str, (px, py), xytext=(0, 5), textcoords="offset points", ha="center", fontsize=8, color=text_color, fontweight="bold")
 
             y_unit = dataset.column_units.get(active_y_cols[0], "")
             ax.set_ylabel(
@@ -727,7 +741,7 @@ class TableGraphEngine:
 
             if matrix and active_cols:
                 mat_np = np.array(matrix)
-                im = ax.imshow(mat_np, cmap="Blues" if not is_dark else "magma", aspect="auto")
+                im = ax.imshow(mat_np, cmap="Blues", aspect="auto")
                 cbar = fig.colorbar(im, ax=ax, shrink=0.8)
                 cbar.ax.tick_params(labelsize=8, labelcolor=text_color)
                 ax.set_xticks(range(len(active_cols)))
@@ -771,28 +785,75 @@ class TableGraphEngine:
             total_val = sum(pie_vals)
             if total_val == 0:
                 pie_vals = [1.0] * len(labels)
+                total_val = float(len(labels))
 
             is_donut = (target_type == ChartType.DONUT_CHART)
-            wedgeprops = dict(width=0.4 if is_donut else None, edgecolor=bg_color, linewidth=1.5)
+            wedgeprops = dict(
+                width=0.38 if is_donut else None,
+                edgecolor="white",
+                linewidth=2.0,
+            )
+
+            # Eliminate text collisions: suppress slice text if slice is under 6%
+            def _clean_donut_autopct(pct: float) -> str:
+                return f"{pct:.1f}%" if pct >= 6.0 else ""
+
             wedges, texts, autotexts = ax.pie(
                 pie_vals,
-                labels=labels if len(labels) <= 5 else None,
-                autopct="%1.1f%%" if len(labels) <= 6 else None,
-                pctdistance=0.75 if is_donut else 0.6,
+                labels=None,  # Suppress outer labels to eliminate edge collisions; use clean aesthetic legend instead!
+                autopct=_clean_donut_autopct,
+                pctdistance=0.80 if is_donut else 0.65,
                 startangle=140,
                 colors=colors[:len(labels)],
                 wedgeprops=wedgeprops,
-                textprops=dict(color=text_color, fontsize=8),
+                textprops=dict(color="#FFFFFF", fontsize=8.5, fontweight="bold"),
             )
+
             for at in autotexts:
-                at.set_color(text_color)
-                at.set_fontsize(8)
-                at.set_weight("bold")
+                at.set_color("#FFFFFF")
+                at.set_fontsize(8.5)
+                at.set_fontweight("bold")
+                at.set_path_effects([
+                    patheffects.withStroke(linewidth=2.0, foreground="#0F172A", alpha=0.55)
+                ])
+
             if is_donut:
-                center_str = f"Total\n{total_val:.1f}" if total_val != 1.0 else "Total"
-                ax.text(0, 0, center_str, ha="center", va="center", color=text_color, fontsize=9, fontweight="bold")
-            if len(labels) > 5:
-                ax.legend(wedges, labels, loc="center left", bbox_to_anchor=(1, 0, 0.5, 1), frameon=False, fontsize=7.5)
+                # Center circular metric readout
+                fmt_total = f"{int(total_val):,}" if float(total_val).is_integer() else f"{total_val:,.1f}"
+                unit_str = dataset.column_units.get(y_col, "")
+                if unit_str and "$" in unit_str:
+                    fmt_total = f"${fmt_total}"
+                elif unit_str:
+                    fmt_total = f"{fmt_total} {unit_str}"
+
+                ax.text(
+                    0, 0.09, "TOTAL",
+                    ha="center", va="center",
+                    color="#64748B", fontsize=8, fontweight="bold",
+                )
+                ax.text(
+                    0, -0.12, fmt_total,
+                    ha="center", va="center",
+                    color="#0F172A", fontsize=12.5, fontweight="bold",
+                )
+
+            # Clean, non-overlapping legend with category name, formatted value, and percentage
+            legend_labels = []
+            for lbl, val in zip(labels, pie_vals):
+                pct = (val / total_val) * 100 if total_val > 0 else 0
+                val_str = f"{int(val):,}" if float(val).is_integer() else f"{val:,.1f}"
+                legend_labels.append(f"{lbl}  ({val_str} · {pct:.1f}%)")
+
+            ax.legend(
+                wedges,
+                legend_labels,
+                loc="center left",
+                bbox_to_anchor=(1.02, 0.5),
+                frameon=True,
+                facecolor="#F8FAFC",
+                edgecolor="#E2E8F0",
+                fontsize=8.5,
+            )
 
         elif target_type == ChartType.STACKED_BAR:
             active_y_cols = y_cols[:6] if len(y_cols) > 1 else [dataset.columns[-1]]
@@ -860,21 +921,61 @@ class TableGraphEngine:
             s_b = [max(0.1, float(r[s_idx_b])) if isinstance(r[s_idx_b], (int, float)) else 1.0 for r in dataset.rows]
 
             min_s, max_s = min(s_b), max(s_b)
-            norm_s = [120 + (v - min_s) / max(1e-5, max_s - min_s) * 800 for v in s_b]
+            # Balanced size range (90 to 450 pt^2) ensures bubbles don't swamp the plot or collide
+            norm_s = [90.0 + (v - min_s) / max(1e-5, max_s - min_s) * 360.0 for v in s_b]
+            bubble_colors = [colors[i % len(colors)] for i in range(len(x_b))]
 
             ax.scatter(
-                x_b, y_b, s=norm_s, color=colors[0], alpha=0.6,
-                edgecolors=bg_color, linewidth=1.2, zorder=4
+                x_b, y_b, s=norm_s, c=bubble_colors, alpha=0.75,
+                edgecolors="#FFFFFF", linewidth=2.0, zorder=4
             )
-            if cat_cols and len(dataset.rows) <= 15:
-                cat_idx = dataset.columns.index(cat_cols[0])
-                for i, r in enumerate(dataset.rows):
-                    lbl = str(r[cat_idx])
-                    if lbl:
-                        ax.annotate(lbl, (x_b[i], y_b[i]), xytext=(5, 5), textcoords="offset points", fontsize=7.5, color=text_color)
 
-            ax.set_xlabel(cfg.x_label or x_c, color=text_color)
-            ax.set_ylabel(cfg.y_label or y_c, color=text_color)
+            # Prevent bubble and label clipping along edges
+            ax.margins(x=0.15, y=0.18)
+
+            # Anti-collision labeling: badge pills with alternating vertical offsets
+            n_rows = len(dataset.rows)
+            cat_idx = dataset.columns.index(cat_cols[0]) if cat_cols else None
+
+            if n_rows <= 25:
+                for i in range(n_rows):
+                    lbl = str(dataset.rows[i][cat_idx]) if cat_idx is not None else f"#{i+1}"
+                    if not lbl:
+                        continue
+                    r_pt = np.sqrt(norm_s[i]) / 2.0
+                    if i % 2 == 0:
+                        y_offset = r_pt + 7
+                        va = "bottom"
+                    else:
+                        y_offset = -(r_pt + 15)
+                        va = "top"
+
+                    ax.annotate(
+                        lbl,
+                        (x_b[i], y_b[i]),
+                        xytext=(0, y_offset),
+                        textcoords="offset points",
+                        ha="center",
+                        va=va,
+                        fontsize=8,
+                        fontweight="bold",
+                        color="#0F172A",
+                        bbox=dict(
+                            boxstyle="round,pad=0.25,rounding_size=0.3",
+                            facecolor="#FFFFFF",
+                            edgecolor="#CBD5E1",
+                            linewidth=0.75,
+                            alpha=0.94,
+                        ),
+                        zorder=5,
+                    )
+
+            x_unit = dataset.column_units.get(x_c, "")
+            y_unit = dataset.column_units.get(y_c, "")
+            x_title = f"{x_c} ({x_unit})" if x_unit and f"({x_unit})" not in x_c else x_c
+            y_title = f"{y_c} ({y_unit})" if y_unit and f"({y_unit})" not in y_c else y_c
+            ax.set_xlabel(cfg.x_label or x_title, color=text_color, fontweight="bold")
+            ax.set_ylabel(cfg.y_label or y_title, color=text_color, fontweight="bold")
 
         elif target_type == ChartType.RADAR_CHART:
             ax.remove()
@@ -1145,10 +1246,10 @@ class TableGraphEngine:
                     cell.set_edgecolor(spine_color)
                     cell.set_linewidth(0.6)
                     if r_idx == 0:
-                        cell.set_facecolor("#1E222A" if is_dark else "#EAECEF")
+                        cell.set_facecolor("#EAECEF")
                         cell.set_text_props(weight="bold", color=text_color)
                     else:
-                        bg = ("#16181D" if r_idx % 2 == 0 else "#101216") if is_dark else ("#FFFFFF" if r_idx % 2 == 0 else "#F7F8FA")
+                        bg = "#FFFFFF" if r_idx % 2 == 0 else "#F8FAFC"
                         cell.set_facecolor(bg)
                         cell.set_text_props(color=text_color)
 
@@ -1167,9 +1268,9 @@ class TableGraphEngine:
                 chart_title = dataset.columns[0] if dataset.columns else "Table Data"
 
         if target_type == ChartType.PAIR_PLOT:
-            fig.suptitle(chart_title, fontsize=11, fontweight="bold", color=text_color)
+            fig.suptitle(chart_title, fontsize=12, fontweight="bold", color=text_color)
         else:
-            ax.set_title(chart_title, fontsize=11, fontweight="bold", pad=12, color=text_color)
+            ax.set_title(chart_title, fontsize=12, fontweight="bold", pad=14, color=text_color)
 
         # Set default x_label ONLY for Cartesian charts that haven't set their own specific x_label
         if target_type in (
