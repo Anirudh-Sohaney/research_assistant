@@ -31,11 +31,16 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self.content = QtWidgets.QStackedWidget()
         self.scores = QtWidgets.QListWidget()
         self.scores.setStyleSheet("QListWidget{color:#DDD;background:#111;border:1px solid #333;border-radius:7px;font:11px Consolas;} QListWidget::item{padding:10px;}")
-        self.scores.currentRowChanged.connect(self._show_detail)
+        self.scores.currentRowChanged.connect(self._show_explanations)
+        self.explanations = QtWidgets.QListWidget()
+        self.explanations.setWordWrap(True)
+        self.explanations.setStyleSheet("QListWidget{color:#DDD;background:#111;border:1px solid #333;border-radius:7px;font:11px Consolas;} QListWidget::item{padding:10px;}")
+        self.explanations.currentRowChanged.connect(self._show_finding)
         self.detail = QtWidgets.QTextEdit()
         self.detail.setReadOnly(True)
         self.detail.setStyleSheet("QTextEdit{color:#EEE;background:#111;border:1px solid #333;border-radius:7px;padding:10px;font:11px Consolas;}")
         self.content.addWidget(self.scores)
+        self.content.addWidget(self.explanations)
         self.content.addWidget(self.detail)
         layout.addWidget(self.content, 1)
 
@@ -47,12 +52,13 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
 
     def _position(self):
         screen = QtGui.QGuiApplication.primaryScreen().availableGeometry()
-        height = 520
+        height = 420
         self.setGeometry(screen.x() + screen.width() - 520, screen.y() + (screen.height() - height) // 2, 500, height)
 
     def show_loading(self):
         self._judges.clear()
         self.scores.clear()
+        self.explanations.clear()
         self.detail.clear()
         self.content.setCurrentWidget(self.scores)
         self.status.setText("RUNNING 8 INDEPENDENT JUDGES...")
@@ -64,7 +70,9 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         rows = [self.scores.item(index).text().split("  ", 1)[-1] for index in range(self.scores.count())]
         score = str(judge.score) if judge.score is not None else "ERR"
         if judge.name not in rows:
-            self.scores.addItem(f"{score:>3}  {judge.name}")
+            item = QtWidgets.QListWidgetItem(f"{score:>3}  {judge.name}")
+            item.setData(QtCore.Qt.ItemDataRole.UserRole, judge.name)
+            self.scores.addItem(item)
         else:
             self.scores.item(rows.index(judge.name)).setText(f"{score:>3}  {judge.name}")
         self.status.setText(f"JUDGES COMPLETE: {len(self._judges)} / 8")
@@ -72,7 +80,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
 
     def show_complete(self, result: PaperAnalysisResult):
         self.status.setText(f"OVERALL SCORE: {result.overall_score if result.overall_score is not None else '--'} / 100")
-        self.footer.setText("CLICK A JUDGE FOR DETAILS   [BACKSPACE] BACK   [ESC] CLOSE")
+        self.footer.setText("CLICK A JUDGE FOR EXPLANATIONS   [ESC] CLOSE")
         self._position(); self.show(); self.raise_(); self.activateWindow(); self.setFocus()
 
     def show_result(self, result: PaperAnalysisResult):
@@ -82,39 +90,57 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
             self.show_judge_result(judge)
         self.show_complete(result)
 
-    def _show_detail(self, index: int):
+    def _show_explanations(self, index: int):
         if index < 0 or index >= self.scores.count():
             return
-        name = self.scores.item(index).text().split("  ", 1)[-1]
+        name = self.scores.item(index).data(QtCore.Qt.ItemDataRole.UserRole) or self.scores.item(index).text().split("  ", 1)[-1]
         judge = self._judges.get(name)
         if judge is None:
             return
+        self.explanations.clear()
         if judge.error:
-            self.detail.setPlainText(f"{judge.name}\n\nERROR: {judge.error}")
+            self.explanations.addItem(f"ERROR\n{judge.error}")
         else:
-            lines = [judge.name.upper(), f"SCORE: {judge.score}/100", "", "DETAILED FINDINGS", ""]
             for number, finding in enumerate(judge.findings, 1):
-                lines.extend([
-                    f"FINDING {number}",
-                    f"SELECTED TEXT\n{finding.excerpt}",
-                    f"ISSUE\n{finding.issue}",
-                    f"EXPLANATION\n{finding.explanation}",
-                    f"RECOMMENDED FIX\n{finding.fix}",
-                    f"DIRECT REWRITE\n{finding.rewrite or '[DELETE THE AFFECTED TEXT]'}",
-                    "",
-                ])
-            self.detail.setPlainText("\n".join(lines))
+                item = QtWidgets.QListWidgetItem(f"EXPLANATION {number}\n{finding.explanation}")
+                item.setData(QtCore.Qt.ItemDataRole.UserRole, number - 1)
+                self.explanations.addItem(item)
+        self.content.setCurrentWidget(self.explanations)
+        self.footer.setText("CLICK AN EXPLANATION FOR REPLACEMENT   [BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
+
+    def _show_finding(self, index: int):
+        if index < 0 or index >= self.explanations.count():
+            return
+        judge_index = self.scores.currentRow()
+        if judge_index < 0:
+            return
+        name = self.scores.item(judge_index).data(QtCore.Qt.ItemDataRole.UserRole) or self.scores.item(judge_index).text().split("  ", 1)[-1]
+        judge = self._judges.get(name)
+        if judge is None or index >= len(judge.findings):
+            return
+        finding = judge.findings[index]
+        self.detail.setPlainText(
+            f"{judge.name.upper()} — EXPLANATION {index + 1}\n\n"
+            f"EXACT TEXT TO REPLACE\n{finding.excerpt}\n\n"
+            f"REPLACE WITH\n{finding.rewrite or '[DELETE THE AFFECTED TEXT]'}\n\n"
+            f"ISSUE\n{finding.issue}\n\n"
+            f"RECOMMENDED FIX\n{finding.fix}"
+        )
         self.content.setCurrentWidget(self.detail)
-        self.footer.setText("[BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
+        self.footer.setText("[BACKSPACE] BACK TO EXPLANATIONS   [ESC] CLOSE")
 
     def _show_list(self):
         self.content.setCurrentWidget(self.scores)
-        self.footer.setText("CLICK A JUDGE FOR DETAILS   [BACKSPACE] BACK   [ESC] CLOSE")
+        self.footer.setText("CLICK A JUDGE FOR EXPLANATIONS   [ESC] CLOSE")
 
     def keyPressEvent(self, event: QtGui.QKeyEvent):
         if event.key() == QtCore.Qt.Key.Key_Escape:
             self.hide(); event.accept(); return
         if event.key() == QtCore.Qt.Key.Key_Backspace and self.content.currentWidget() is self.detail:
+            self.content.setCurrentWidget(self.explanations)
+            self.footer.setText("CLICK AN EXPLANATION FOR REPLACEMENT   [BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
+            event.accept(); return
+        if event.key() == QtCore.Qt.Key.Key_Backspace and self.content.currentWidget() is self.explanations:
             self._show_list(); event.accept(); return
         super().keyPressEvent(event)
 
