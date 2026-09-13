@@ -14,6 +14,7 @@ from app import init_application, shutdown_application
 from app.models import ShutdownReason
 from overlay_ui import get_synonym_overlay_bridge
 from overlay_ui.reword_overlay import get_reword_overlay_bridge
+from data_to_graph.overlay import get_table_graph_overlay_bridge
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,9 +34,10 @@ def main():
         qt_app = QtWidgets.QApplication(sys.argv)
     qt_app.setQuitOnLastWindowClosed(False)
 
-    # Pre-warm PyQt Sci-Fi Synonym Overlay & Bridge
+    # Pre-warm PyQt Sci-Fi Overlays & Bridges on GUI Thread
     bridge = get_synonym_overlay_bridge()
     get_reword_overlay_bridge()
+    get_table_graph_overlay_bridge()
 
     context = init_application()
     print(f"Session ID  : {context.session_id}")

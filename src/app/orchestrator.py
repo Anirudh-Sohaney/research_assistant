@@ -467,32 +467,48 @@ class AppOrchestrator:
                 )
 
             elif action == ActionTrigger.GENERATE_GRAPH:
-                dataset = parse_tabular_data(text)
-                chart = generate_chart(dataset)
-                payload = PopupCardPayload(
-                    card_type=CardType.GRAPH_PREVIEW,
-                    title=f"Chart: {chart.chart_type.value}",
-                    items=[
-                        PopupItem(
-                            id="chart_1",
-                            title=chart.chart_type.value.replace("_", " ").title(),
-                            subtitle=f"Rows: {len(chart.dataset.rows)} | Cols: {len(chart.dataset.columns)}",
-                        )
-                    ],
-                    custom_data={"chart_type": chart.chart_type.value, "alternatives": [a.value for a in chart.available_alternatives]},
-                )
-                handle = self.overlay_manager.display_popup_card(payload, default_anchor)
-                elapsed = (time.monotonic() - start_time) * 1000.0
-                return ActionResult(
-                    success=True,
-                    action=action,
-                    latency_ms=round(elapsed, 2),
-                    tokens_used=0,
-                    tier="TIER_1_LOCAL",
-                    output_summary=f"Generated {chart.chart_type.value} chart with 0 tokens.",
-                    ui_handle_id=handle.window_id,
-                    data=chart,
-                )
+                from data_to_graph.overlay import get_table_graph_overlay_bridge
+                bridge = get_table_graph_overlay_bridge()
+                if bridge is not None:
+                    target_hwnd = getattr(self, "last_foreground_hwnd", None)
+                    bridge.sig_show_table[str, object].emit(text, target_hwnd)
+                    elapsed = (time.monotonic() - start_time) * 1000.0
+                    return ActionResult(
+                        success=True,
+                        action=action,
+                        latency_ms=round(elapsed, 2),
+                        tokens_used=0,
+                        tier="TIER_1_LOCAL",
+                        output_summary="Opened Table to Graph Visualizer overlay.",
+                        ui_handle_id="table_graph_overlay",
+                    )
+                else:
+                    dataset = parse_tabular_data(text)
+                    chart = generate_chart(dataset)
+                    payload = PopupCardPayload(
+                        card_type=CardType.GRAPH_PREVIEW,
+                        title=f"Chart: {chart.chart_type.value}",
+                        items=[
+                            PopupItem(
+                                id="chart_1",
+                                title=chart.chart_type.value.replace("_", " ").title(),
+                                subtitle=f"Rows: {len(chart.dataset.rows)} | Cols: {len(chart.dataset.columns)}",
+                            )
+                        ],
+                        custom_data={"chart_type": chart.chart_type.value, "alternatives": [a.value for a in chart.available_alternatives]},
+                    )
+                    handle = self.overlay_manager.display_popup_card(payload, default_anchor)
+                    elapsed = (time.monotonic() - start_time) * 1000.0
+                    return ActionResult(
+                        success=True,
+                        action=action,
+                        latency_ms=round(elapsed, 2),
+                        tokens_used=0,
+                        tier="TIER_1_LOCAL",
+                        output_summary=f"Generated {chart.chart_type.value} chart with 0 tokens.",
+                        ui_handle_id=handle.window_id,
+                        data=chart,
+                    )
 
             elif action == ActionTrigger.REWORD_TEXT:
                 reword_res = _run_async(reword_text_segment(text))
@@ -676,6 +692,14 @@ class AppOrchestrator:
 
         try:
             bridge = get_reword_overlay_bridge()
+            if bridge:
+                bridge.sig_close.emit()
+        except Exception:
+            pass
+
+        try:
+            from data_to_graph.overlay import get_table_graph_overlay_bridge
+            bridge = get_table_graph_overlay_bridge()
             if bridge:
                 bridge.sig_close.emit()
         except Exception:
