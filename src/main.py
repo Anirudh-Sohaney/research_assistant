@@ -46,7 +46,7 @@ def main():
     print("  * Synonyms       : Alt + O (Sci-Fi right-edge popup; Up/Down to navigate, Enter to apply, Esc to cancel)")
     print("  * Definitions    : Ctrl + Shift + D")
     print("  * Table to Graph : Ctrl + Shift + G")
-    print("  * Full Reword    : Alt + P (choose Reword, Add Detail, or Simplify; Enter applies, R regenerates)")
+    print("  * Reword         : Alt + P (choose Reword, Add Detail, or Simplify; Enter applies, R regenerates)")
     print("  * Quick Reword   : Ctrl + Shift + R")
     print("  * Discover Papers: Ctrl + Shift + P")
     print("  * Verify Evidence: Ctrl + Shift + E")

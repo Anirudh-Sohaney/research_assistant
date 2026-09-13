@@ -129,7 +129,7 @@ class SciFiFilteringWidget(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         width = self.width()
         painter.setPen(QtGui.QColor("#666666"))
-        painter.drawText(0, 12, width, 16, QtCore.Qt.AlignmentFlag.AlignCenter, "LING // SEMANTIC FILTER")
+        painter.drawText(0, 12, width, 16, QtCore.Qt.AlignmentFlag.AlignCenter, "SEMANTIC FILTER")
         lane_y = [42, 57, 72]
         lane_width = max(80, width - 42)
         sweep_x = 18 + (self._frame / 35.0) * lane_width
@@ -214,7 +214,7 @@ class SciFiLoadingWidget(QtWidgets.QWidget):
     def show_filtering_stage(self):
         self._stage_stack.setCurrentWidget(self._filtering_view)
         self._status_label.setText("FILTERING FOR FIT")
-        self._sub_label.setText("LING // CONTEXT + TENSE + REGISTER")
+        self._sub_label.setText("CONTEXT + TENSE + REGISTER")
 
 
 class SciFiSynonymListWidget(QtWidgets.QListWidget):

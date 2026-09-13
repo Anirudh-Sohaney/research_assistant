@@ -158,7 +158,7 @@ def test_pyqt_synonym_overlay_full_flow():
     assert overlay._stack.currentIndex() == 0
     assert overlay._loading_widget._stage_stack.currentIndex() == 0
 
-    # 1b. Candidate harvest completed; show Ling's semantic filtering phase.
+    # 1b. Candidate harvest completed; show semantic filtering phase.
     bridge.sig_show_filtering.emit()
     app.processEvents()
     assert overlay._loading_widget._stage_stack.currentIndex() == 1
