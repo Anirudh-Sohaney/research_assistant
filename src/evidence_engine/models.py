@@ -1,7 +1,6 @@
-"""Evidence Engine — Part 1 data models.
+"""Evidence Engine data models.
 
-Only what paper extraction needs: an immutable reference to a paper and the
-per-source retrieval report. Stance/evidence models arrive in later parts.
+Minimal, frozen dataclasses for paper references and retrieval results.
 """
 
 from __future__ import annotations
@@ -12,11 +11,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class PaperRef:
-    """Normalized identity of one paper, independent of which source produced it.
-
-    `source` records the adapter that yielded this row (first source wins on
-    cross-source duplicates, keyed by DOI when present).
-    """
+    """Normalized identity of a paper, independent of source adapter."""
 
     title: str
     authors: str
@@ -31,26 +26,39 @@ class PaperRef:
 
 
 @dataclass
-class SourceReport:
-    """Outcome of one source adapter run — never an exception."""
-
-    name: str
-    papers: int = 0
-    status: str = "ok"  # "ok" | "ok (N/M variants failed)" | "degraded: ..."
-
-    def as_dict(self) -> dict:
-        return {"papers": self.papers, "status": self.status}
-
-
-@dataclass
 class RetrievalResult:
-    """Aggregate Stage-1 output: papers + per-source report + wall time."""
+    """Aggregate retrieval output: deduplicated papers + per-source report."""
 
     papers: list  # list[PaperRef]
-    sources: dict = field(default_factory=dict)  # name -> SourceReport.as_dict()
+    sources: dict = field(default_factory=dict)  # name -> {"papers": int, "status": str}
     wall_ms: float = 0.0
+    raw: list = field(default_factory=list)  # parallel list of source-specific dicts
 
     def summary(self) -> str:
         src = ", ".join(f"{k}={v['papers']}" for k, v in self.sources.items())
-        return (f"{len(self.papers)} unique papers in {self.wall_ms:.0f} ms "
-                f"[{src}]")
+        return f"{len(self.papers)} unique papers in {self.wall_ms:.0f} ms [{src}]"
+
+
+@dataclass(frozen=True)
+class EvidenceItem:
+    """A single piece of evidence: a sentence judged by the LLM."""
+
+    quote: str
+    paper: PaperRef
+    confidence: float
+    section: str = ""
+
+
+@dataclass
+class EvidenceResult:
+    """Final pipeline output: top evidence items for a claim."""
+
+    claim: str
+    items: list  # list[EvidenceItem]
+    total_papers: int = 0
+    total_sentences: int = 0
+    wall_ms: float = 0.0
+
+    def summary(self) -> str:
+        return (f"{len(self.items)} evidence items from {self.total_papers} papers "
+                f"({self.total_sentences} sentences) in {self.wall_ms:.0f} ms")
