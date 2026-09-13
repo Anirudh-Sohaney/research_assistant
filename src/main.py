@@ -17,6 +17,7 @@ from overlay_ui.reword_overlay import get_reword_overlay_bridge
 from data_to_graph.overlay import get_table_graph_overlay_bridge
 from paper_analysis.overlay import get_paper_analysis_bridge
 from engines.citation_engine.overlay import get_citation_overlay_bridge
+from overlay_ui.theme import apply_beige_theme
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +43,9 @@ def main():
     get_table_graph_overlay_bridge()
     get_paper_analysis_bridge()
     get_citation_overlay_bridge()
+    for popup in qt_app.topLevelWidgets():
+        if isinstance(popup, QtWidgets.QWidget):
+            apply_beige_theme(popup)
 
     context = init_application()
     print(f"Session ID  : {context.session_id}")
