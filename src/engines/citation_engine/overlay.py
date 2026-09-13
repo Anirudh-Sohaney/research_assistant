@@ -389,6 +389,35 @@ class CitationOverlay(QtWidgets.QWidget):
 
         root.addWidget(self._card)
         self.resize(480, 310)
+        self._apply_beige_theme()
+
+    def _apply_beige_theme(self):
+        """Apply the high-contrast beige/black visual system to the complete card."""
+        beige = "#F3E7CF"
+        black = "#000000"
+        self._card.setStyleSheet(
+            f"QFrame {{ background-color: {beige}; color: {black}; border: 4px solid {black}; border-radius: 12px; }}"
+        )
+        for widget in self._card.findChildren(QtWidgets.QWidget):
+            if widget is self._card:
+                continue
+            if isinstance(widget, QtWidgets.QPushButton):
+                widget.setStyleSheet(
+                    f"QPushButton {{ background-color: {beige}; color: {black}; border: 3px solid {black}; border-radius: 6px; font-weight: bold; padding: 4px 10px; }}"
+                    f"QPushButton:hover, QPushButton:checked {{ background-color: #E7D3AE; color: {black}; border: 3px solid {black}; }}"
+                )
+            elif isinstance(widget, (QtWidgets.QLineEdit, QtWidgets.QTextEdit)):
+                widget.setStyleSheet(
+                    f"background-color: {beige}; color: {black}; border: 3px solid {black}; border-radius: 6px; padding: 6px; font-weight: bold;"
+                )
+            elif isinstance(widget, QtWidgets.QLabel):
+                widget.setStyleSheet(
+                    f"background-color: transparent; color: {black}; border: none; font-weight: bold;"
+                )
+            elif isinstance(widget, QtWidgets.QStackedWidget):
+                widget.setStyleSheet(f"background-color: {beige}; color: {black}; border: 3px solid {black};")
+            else:
+                widget.setStyleSheet(f"background-color: {beige}; color: {black}; font-weight: bold;")
 
     def position_centered_or_near_cursor(self):
         cursor_pos = QtGui.QCursor.pos()
