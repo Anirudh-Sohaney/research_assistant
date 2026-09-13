@@ -60,7 +60,7 @@ CHART_ICONS: Dict[ChartType, str] = {
 
 
 class TableGraphToast(QtWidgets.QWidget):
-    """Cyber-academic floating notification toast for instant visual feedback."""
+    """Simple, elegant floating pill toast for instant copy confirmation."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
@@ -75,26 +75,25 @@ class TableGraphToast(QtWidgets.QWidget):
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_QuitOnClose, False)
 
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setContentsMargins(4, 4, 4, 4)
 
         card = QtWidgets.QFrame()
         card.setStyleSheet(
-            "QFrame { background:#0A0A0A; border:1px solid #00E5FF; border-radius:8px; }"
+            "QFrame { background:#0F172A; border:1px solid #334155; border-radius:18px; }"
         )
         card_layout = QtWidgets.QVBoxLayout(card)
-        card_layout.setContentsMargins(14, 10, 14, 10)
-        card_layout.setSpacing(4)
+        card_layout.setContentsMargins(18, 8, 18, 8)
+        card_layout.setSpacing(2)
 
-        self._title = QtWidgets.QLabel("// TABLE // GRAPH")
-        self._title.setStyleSheet("color:#00E5FF; font:bold 9px Consolas; background:transparent;")
-        card_layout.addWidget(self._title)
-
-        self._msg = QtWidgets.QLabel("✓ FIGURE COPIED & PASTED")
-        self._msg.setStyleSheet("color:#FFFFFF; font:bold 11px Consolas; background:transparent;")
+        self._msg = QtWidgets.QLabel("Copied to clipboard")
+        self._msg.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._msg.setStyleSheet("color:#F8FAFC; font:bold 11px 'Segoe UI', 'Inter', Consolas, sans-serif; background:transparent;")
         card_layout.addWidget(self._msg)
 
-        self._hint = QtWidgets.QLabel("Pasted below table. Press [Ctrl+V] in any app.")
-        self._hint.setStyleSheet("color:#888888; font:9px Consolas; background:transparent;")
+        self._hint = QtWidgets.QLabel("")
+        self._hint.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._hint.setStyleSheet("color:#94A3B8; font:9.5px 'Segoe UI', 'Inter', Consolas, sans-serif; background:transparent;")
+        self._hint.hide()
         card_layout.addWidget(self._hint)
 
         layout.addWidget(card)
@@ -102,7 +101,7 @@ class TableGraphToast(QtWidgets.QWidget):
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.hide)
 
-    def show_toast(self, message: str, hint: str = "", duration_ms: int = 3000):
+    def show_toast(self, message: str = "Copied to clipboard", hint: str = "", duration_ms: int = 1800):
         self._msg.setText(message)
         if hint:
             self._hint.setText(hint)
@@ -113,8 +112,9 @@ class TableGraphToast(QtWidgets.QWidget):
         cursor_pos = QtGui.QCursor.pos()
         screen_obj = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
         screen = screen_obj.availableGeometry() if screen_obj else QtCore.QRect(0, 0, 1920, 1080)
-        w, h = 420, 80
-        self.setGeometry(screen.x() + screen.width() - w - 24, screen.y() + screen.height() - h - 40, w, h)
+        w = 200 if not hint else 300
+        h = 42 if not hint else 62
+        self.setGeometry(screen.x() + screen.width() - w - 28, screen.y() + screen.height() - h - 36, w, h)
         self.show()
         self._timer.start(duration_ms)
 
@@ -582,11 +582,8 @@ class TableGraphOverlay(QtWidgets.QWidget):
         self.hide()
         self.apply_requested.emit()
 
-        # 4. Show instant non-intrusive floating confirmation toast
-        self._show_toast(
-            "✓ FIGURE COPIED TO CLIPBOARD",
-            "Ready to paste with [Ctrl+V] into any application.",
-        )
+        # 4. Show instant clean floating confirmation toast
+        self._show_toast("Copied to clipboard")
 
         # 5. Restore target application and paste below table
         self._perform_paste_below_table(target_hwnd)
@@ -637,10 +634,7 @@ class TableGraphOverlay(QtWidgets.QWidget):
         self.hide()
         self.apply_requested.emit()
 
-        self._show_toast(
-            "✓ TABLE + GRAPH READY",
-            "Pasting table & graph... Press [Ctrl+V] anytime in any app.",
-        )
+        self._show_toast("Copied to clipboard")
 
         self._perform_direct_paste(target_hwnd)
 
