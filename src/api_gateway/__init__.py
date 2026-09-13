@@ -1,0 +1,63 @@
+"""API Gateway Subsystem for Research Aid."""
+
+from api_gateway.models import (
+    ExternalService,
+    RequestPayload,
+    ApiResponse,
+    AuthConfig,
+    TokenUsageReport,
+)
+from api_gateway.gateway import (
+    ApiGateway,
+    dispatch_api_request,
+    configure_credentials,
+    get_token_usage_report,
+)
+from api_gateway.oauth import (
+    DeviceCodeResponse,
+    OAuthCredentials,
+    OAuthError,
+    OAuthExpiredTokenError,
+    OAuthAccessDeniedError,
+    OAuthTimeoutError,
+    OpenAIOAuthClient,
+    apply_oauth_credentials_to_gateway,
+    clear_oauth_credentials,
+    get_default_api_key_credentials_path,
+    get_default_credentials_path,
+    get_valid_openai_token,
+    load_oauth_credentials,
+    save_oauth_credentials,
+    start_openai_device_flow,
+    verify_and_save_real_openai_credentials,
+    verify_real_openai_api_key,
+)
+
+__all__ = [
+    "ExternalService",
+    "RequestPayload",
+    "ApiResponse",
+    "AuthConfig",
+    "TokenUsageReport",
+    "ApiGateway",
+    "dispatch_api_request",
+    "configure_credentials",
+    "get_token_usage_report",
+    "DeviceCodeResponse",
+    "OAuthCredentials",
+    "OAuthError",
+    "OAuthExpiredTokenError",
+    "OAuthAccessDeniedError",
+    "OAuthTimeoutError",
+    "OpenAIOAuthClient",
+    "apply_oauth_credentials_to_gateway",
+    "clear_oauth_credentials",
+    "get_default_api_key_credentials_path",
+    "get_default_credentials_path",
+    "get_valid_openai_token",
+    "load_oauth_credentials",
+    "save_oauth_credentials",
+    "start_openai_device_flow",
+    "verify_and_save_real_openai_credentials",
+    "verify_real_openai_api_key",
+]

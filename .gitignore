@@ -1,0 +1,28 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+htmlcov/
+.model_cache/
+
+# Automation and runtime logs
+*.log
+@AutomationLog.txt
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+selection_capture.json
+
+# Tooling
+.opencode/
+
+# OS files
+.DS_Store
+Thumbs.db
