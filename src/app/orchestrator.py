@@ -14,7 +14,6 @@ import tempfile
 import time
 import uuid
 from typing import Any, Coroutine, Dict, List, Optional, Tuple, TypeVar
-import pyperclip
 
 from app.models import (
     ActionResult,
@@ -90,7 +89,6 @@ class AppOrchestrator:
         self._paper_analysis_bridge = None
         self._paper_analysis_bridge_connected = False
         self._paper_analysis_generation = 0
-        self._paper_analysis_target_hwnd: Optional[int] = None
         self._citation_bridge = None
         self._citation_bridge_connected = False
         self._citation_selected_text = ""
@@ -151,21 +149,15 @@ class AppOrchestrator:
 
     def _configure_paper_analysis_overlay(self):
         bridge = get_paper_analysis_bridge()
-        if bridge is not None and not self._paper_analysis_bridge_connected:
-            # Connect at the actual widget source. This avoids relying on a
-            # signal-to-signal relay across the bridge for the interactive action.
-            bridge.overlay.apply_fix_requested.connect(self._apply_paper_fix)
-            self._paper_analysis_bridge_connected = True
         self._paper_analysis_bridge = bridge
         return bridge
 
-    def _open_paper_analysis(self, selected_text: str, target_hwnd: Optional[int] = None):
+    def _open_paper_analysis(self, selected_text: str):
         bridge = self._configure_paper_analysis_overlay()
         if bridge is None:
             return False
         self._paper_analysis_generation += 1
         generation = self._paper_analysis_generation
-        self._paper_analysis_target_hwnd = target_hwnd
         bridge.sig_show_loading.emit()
 
         def worker():
@@ -185,54 +177,6 @@ class AppOrchestrator:
 
         threading.Thread(target=worker, daemon=True).start()
         return True
-
-    def _apply_paper_fix(self, judge_name: str, finding_index: int, excerpt: str, replacement: str):
-        """Hide analysis, find the exact excerpt, replace it, then remove that finding."""
-        log.info("Applying paper finding fix: judge=%s finding=%s", judge_name, finding_index)
-        if not excerpt.strip() or self._paper_analysis_bridge is None:
-            log.warning("Paper finding fix skipped: missing excerpt or bridge")
-            return
-        bridge = self._paper_analysis_bridge
-        bridge.sig_close.emit()
-
-        def worker():
-            try:
-                if self._paper_analysis_target_hwnd and sys.platform == "win32":
-                    import ctypes
-                    ctypes.windll.user32.SetForegroundWindow(self._paper_analysis_target_hwnd)
-                import ctypes
-                u32 = ctypes.windll.user32
-                previous_clipboard = pyperclip.paste()
-                try:
-                    pyperclip.copy(excerpt)
-                    u32.keybd_event(0x11, 0, 0, 0)  # Ctrl down
-                    u32.keybd_event(0x46, 0, 0, 0)  # F down/up
-                    u32.keybd_event(0x46, 0, 0x0002, 0)
-                    u32.keybd_event(0x11, 0, 0x0002, 0)  # Ctrl up
-                    time.sleep(0.12)
-                    u32.keybd_event(0x11, 0, 0, 0)
-                    u32.keybd_event(0x56, 0, 0, 0)  # Ctrl+V into find box
-                    u32.keybd_event(0x56, 0, 0x0002, 0)
-                    u32.keybd_event(0x11, 0, 0x0002, 0)
-                    time.sleep(0.08)
-                    u32.keybd_event(0x0D, 0, 0, 0)  # Enter
-                    u32.keybd_event(0x0D, 0, 0x0002, 0)
-                    u32.keybd_event(0x1B, 0, 0, 0)  # Escape
-                    u32.keybd_event(0x1B, 0, 0x0002, 0)
-                    time.sleep(0.08)
-                    if replacement:
-                        inject_text_replacement(replacement, original_text=excerpt)
-                    else:
-                        u32.keybd_event(0x2E, 0, 0, 0)  # Delete selected excerpt
-                        u32.keybd_event(0x2E, 0, 0x0002, 0)
-                finally:
-                    pyperclip.copy(previous_clipboard)
-                bridge.sig_remove_finding.emit(judge_name, finding_index)
-            except Exception as exc:
-                log.error("Paper finding fix failed: %s", exc)
-                bridge.sig_restore.emit()
-
-        threading.Thread(target=worker, daemon=True).start()
 
     def _configure_reword_overlay(self):
         """Connects the interactive reword popup once on the Qt application thread."""
@@ -433,7 +377,7 @@ class AppOrchestrator:
                         print("[SELECTION] No text currently highlighted in active window.", flush=True)
                         return
                     print(f"[SELECTION] Text: '{payload.selected_text}'", flush=True)
-                    opened = self._open_paper_analysis(payload.selected_text, target_hwnd)
+                    opened = self._open_paper_analysis(payload.selected_text)
                     print("[STATUS] Started 8-judge paper analysis." if opened else "[STATUS] Paper analysis unavailable.", flush=True)
                     return
                 trigger = action_map.get(event.action)
