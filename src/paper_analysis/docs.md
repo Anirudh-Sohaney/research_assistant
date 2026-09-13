@@ -15,7 +15,7 @@ Alt+J extracts the highlighted text, opens the analysis overlay, and launches ei
 7. Methodology — reproducibility, variables, samples, controls, and evaluation design.
 8. Contribution — novelty, significance, limitations, and conclusion alignment.
 
-Each judge must return strict JSON with a raw score and 3–6 findings. Findings contain an exact excerpt, the issue, and a concrete fix. Empty, malformed, or under-specified responses receive up to three larger-budget retries. Invalid or failed judges remain visible as errors rather than receiving fabricated findings.
+Each judge must return strict JSON with a raw score and 3–6 findings. Each finding contains the exact sentence or paragraph with the issue, a 100–200 word explanation of the issue and correction, a concrete repair instruction, and a direct rewrite. The rewrite is an empty string when deletion is the correct fix. Empty, malformed, or under-specified responses receive up to three larger-budget retries. Invalid or failed judges remain visible as errors rather than receiving fabricated findings.
 
 ## API
 

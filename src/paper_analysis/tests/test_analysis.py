@@ -13,7 +13,14 @@ from paper_analysis.analysis import JUDGE_RUBRICS, _run_judge, analyze_paper
 
 
 def _response(name: str, score: int = 84):
-    return ApiResponse(200, {"choices": [{"message": {"content": '{"score":%d,"findings":[{"excerpt":"sample phrase","issue":"%s issue","fix":"Rewrite this phrase precisely."},{"excerpt":"another phrase","issue":"Needs support","fix":"Add the missing explanation."},{"excerpt":"the conclusion","issue":"Too broad","fix":"Limit the claim to the evidence."}]}' % (score, name)}}]}, 1.0, tokens_consumed=11)
+    explanation = " ".join(["This explanation describes the issue and explains how a precise revision resolves it for readers."] * 12)
+    findings = [
+        {"excerpt": "sample phrase", "issue": f"{name} issue", "explanation": explanation, "fix": "Rewrite this phrase precisely.", "rewrite": "A precise replacement phrase."},
+        {"excerpt": "another phrase", "issue": "Needs support", "explanation": explanation, "fix": "Add the missing explanation.", "rewrite": "Another phrase with the needed explanation."},
+        {"excerpt": "the conclusion", "issue": "Too broad", "explanation": explanation, "fix": "Limit the claim to the evidence.", "rewrite": "The conclusion is limited to the reported evidence."},
+    ]
+    import json
+    return ApiResponse(200, {"choices": [{"message": {"content": json.dumps({"score": score, "findings": findings})}}]}, 1.0, tokens_consumed=11)
 
 
 @pytest.mark.asyncio
@@ -24,6 +31,7 @@ async def test_eight_full_text_judges_run_and_return_scores():
     assert len(result.judges) == 8
     assert result.overall_score == 87
     assert all(j.score == 87 and len(j.findings) == 3 for j in result.judges)
+    assert all(100 <= len(f.explanation.split()) <= 200 and f.rewrite for j in result.judges for f in j.findings)
 
 
 @pytest.mark.asyncio
@@ -42,12 +50,9 @@ async def test_each_judge_payload_contains_complete_selected_text():
 
 @pytest.mark.asyncio
 async def test_failed_judge_is_visible_without_fabricating_findings():
-    responses = [_response("ok") for _ in range(7)] + [ApiResponse(503, None, 1.0, error="offline")]
-    with patch("paper_analysis.analysis.dispatch_api_request", side_effect=responses):
+    with patch("paper_analysis.analysis.dispatch_api_request", return_value=ApiResponse(503, None, 1.0, error="offline")):
         result = await analyze_paper("A paper paragraph.")
-    assert sum(j.score is not None for j in result.judges) == 7
-    assert result.judges[-1].score is None
-    assert result.judges[-1].findings == []
+    assert all(j.score is None and j.findings == [] for j in result.judges)
 
 
 @pytest.mark.asyncio

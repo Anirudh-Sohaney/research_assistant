@@ -35,6 +35,8 @@ class Finding:
     excerpt: str
     issue: str
     fix: str
+    explanation: str
+    rewrite: str = ""
 
 
 @dataclass
@@ -84,16 +86,19 @@ def _parse_json(content: object) -> Dict[str, object]:
     raise ValueError("judge response did not contain valid JSON")
 
 
-def _judge_prompt(name: str, rubric: str, selected_text: str) -> List[Dict[str, str]]:
+def _judge_prompt(name: str, rubric: str, selected_text: str, retry: bool = False) -> List[Dict[str, str]]:
     system = (
         "You are one independent academic paper reviewer. Analyze only the supplied text, not hidden context. "
         f"Your assigned dimension is {name}: {rubric} "
         "Score quality from 1 to 100 using this raw scale: 1-30 fundamentally deficient, 31-49 many serious issues, "
         "50-69 multiple issues but salvageable, 70-89 strong with revisions, 90-99 publishable quality, 100 utterly perfect. "
-        "Return exactly 3 to 6 concrete findings. Each finding must quote a short exact excerpt from the supplied text, "
-        "identify the specific problem, and give a direct repair instruction. Do not praise generally, invent facts, or review other dimensions. "
-        'Return strict JSON: {"score": 1-100, "findings": [{"excerpt":"...", "issue":"...", "fix":"..."}]}.'
+        "Return exactly 3 concrete findings. Each finding must quote the exact sentence or paragraph containing the issue, "
+        "give an explanation of 100 to 200 words describing why it is a problem and how to fix it, and provide a direct rewritten replacement when a rewrite is applicable. "
+        "Set rewrite to an empty string only when the correct fix is deletion. Do not praise generally, invent facts, or review other dimensions. "
+        'Return strict JSON: {"score": 1-100, "findings": [{"excerpt":"...", "issue":"...", "explanation":"100-200 words...", "fix":"...", "rewrite":"... or empty"}]}.'
     )
+    if retry:
+        system += " This is a retry after invalid output. Before emitting JSON, count the findings and words in every explanation: provide exactly 3 findings, and make every explanation 100–200 words."
     user = f"FULL SELECTED PAPER TEXT:\n{selected_text}"
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
@@ -106,7 +111,7 @@ async def _run_judge(name: str, rubric: str, selected_text: str) -> JudgeResult:
             method="POST",
             json_body={
                 "model": DEFAULT_MODEL,
-                "messages": _judge_prompt(name, rubric, selected_text),
+                "messages": _judge_prompt(name, rubric, selected_text, retry=attempt > 0),
                 "temperature": 0.2,
                 "reasoning": {"effort": "low", "exclude": True},
             },
@@ -132,9 +137,12 @@ async def _run_judge(name: str, rubric: str, selected_text: str) -> JudgeResult:
                     continue
                 excerpt = str(item.get("excerpt", "")).strip()
                 issue = str(item.get("issue", "")).strip()
+                explanation = str(item.get("explanation", "")).strip()
                 fix = str(item.get("fix", "")).strip()
-                if excerpt and issue and fix:
-                    findings.append(Finding(excerpt, issue, fix))
+                rewrite = str(item.get("rewrite", "")).strip()
+                explanation_words = len(explanation.split())
+                if excerpt and issue and fix and 100 <= explanation_words <= 200:
+                    findings.append(Finding(excerpt, issue, fix, explanation, rewrite))
             if len(findings) < 3:
                 raise ValueError("judge returned fewer than 3 actionable findings")
             return JudgeResult(name, _score_quality(parsed.get("score")), findings[:6], tokens_used=total_tokens)

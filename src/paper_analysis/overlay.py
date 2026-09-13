@@ -97,8 +97,10 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
                 lines.extend([
                     f"FINDING {number}",
                     f"SELECTED TEXT\n{finding.excerpt}",
-                    f"PROBLEM\n{finding.issue}",
+                    f"ISSUE\n{finding.issue}",
+                    f"EXPLANATION\n{finding.explanation}",
                     f"RECOMMENDED FIX\n{finding.fix}",
+                    f"DIRECT REWRITE\n{finding.rewrite or '[DELETE THE AFFECTED TEXT]'}",
                     "",
                 ])
             self.detail.setPlainText("\n".join(lines))
