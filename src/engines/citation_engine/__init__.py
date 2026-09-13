@@ -15,6 +15,7 @@ from engines.citation_engine.models import (
     ReferenceMetadata,
     SourceType,
 )
+from engines.citation_engine.overlay import CitationOverlayBridge, get_citation_overlay_bridge
 from engines.citation_engine.renderers.apa import APA7Renderer
 from engines.citation_engine.renderers.base import BaseStyleRenderer
 from engines.citation_engine.renderers.bibtex import BibTeXRenderer
@@ -44,4 +45,6 @@ __all__ = [
     "FieldConfidence",
     "ReferenceMetadata",
     "SourceType",
+    "CitationOverlayBridge",
+    "get_citation_overlay_bridge",
 ]

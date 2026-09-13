@@ -22,6 +22,10 @@ from overlay_ui.pyqt_synonym_overlay import (
     SynonymOverlayBridge,
     get_synonym_overlay_bridge,
 )
+from engines.citation_engine.overlay import (
+    CitationOverlayBridge,
+    get_citation_overlay_bridge,
+)
 
 __all__ = [
     "CardType",
@@ -39,4 +43,6 @@ __all__ = [
     "PyQtSynonymOverlay",
     "SynonymOverlayBridge",
     "get_synonym_overlay_bridge",
+    "CitationOverlayBridge",
+    "get_citation_overlay_bridge",
 ]

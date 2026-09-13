@@ -26,6 +26,8 @@ from engines.citation_engine.renderers.mla import MLA9Renderer
 
 log = logging.getLogger("citation_engine.service")
 
+_shared_cache = CitationCache()
+
 
 class CitationService:
     """End-to-end orchestrator resolving URLs, DOIs, and ISBNs into formatted citations."""
@@ -35,7 +37,7 @@ class CitationService:
         cache: Optional[CitationCache] = None,
         timeout_secs: float = 8.0,
     ):
-        self.cache = cache or CitationCache()
+        self.cache = cache if cache is not None else _shared_cache
         self.crossref = CrossrefExtractor(timeout_secs=timeout_secs)
         self.openlibrary = OpenLibraryExtractor(timeout_secs=timeout_secs)
         self.meta_jsonld = MetaJsonLdExtractor(timeout_secs=timeout_secs)

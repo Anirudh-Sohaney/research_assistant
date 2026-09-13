@@ -32,6 +32,8 @@ DEFAULT_KEY_BINDINGS: Dict[str, str] = {
     "source_summary": "<ctrl>+<shift>+u",
     "paper_analysis": "<alt>+j",
     "selection_capture": "<alt>+<shift>+o",
+    "citation": "<ctrl>+<shift>+c",
+    "citation_popup": "<alt>+c",
 }
 
 IS_WINDOWS = sys.platform == "win32"

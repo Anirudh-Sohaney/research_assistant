@@ -16,6 +16,7 @@ from overlay_ui import get_synonym_overlay_bridge
 from overlay_ui.reword_overlay import get_reword_overlay_bridge
 from data_to_graph.overlay import get_table_graph_overlay_bridge
 from paper_analysis.overlay import get_paper_analysis_bridge
+from engines.citation_engine.overlay import get_citation_overlay_bridge
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +41,7 @@ def main():
     get_reword_overlay_bridge()
     get_table_graph_overlay_bridge()
     get_paper_analysis_bridge()
+    get_citation_overlay_bridge()
 
     context = init_application()
     print(f"Session ID  : {context.session_id}")
@@ -56,6 +58,8 @@ def main():
     print("  * Verify Evidence: Ctrl + Shift + E")
     print("  * Source Summary : Ctrl + Shift + U")
     print("  * Paper Analysis : Alt + J (8 independent judges; click a score for findings)")
+    print("  * Cite Source    : Alt + C (Interactive Citation Card; APA, MLA, Chicago, IEEE, BibTeX)")
+    print("  * Quick Cite     : Ctrl + Shift + C (Format & inject citation in-place)")
     print("=" * 65)
     print("Background listener active. Ready for word processor actions...")
     sys.stdout.flush()

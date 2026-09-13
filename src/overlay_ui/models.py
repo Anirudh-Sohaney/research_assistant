@@ -14,6 +14,7 @@ class CardType(str, Enum):
     SIMILAR_PAPERS = "SIMILAR_PAPERS"
     SOURCE_SUMMARY = "SOURCE_SUMMARY"
     GRAPH_PREVIEW = "GRAPH_PREVIEW"
+    CITATION = "CITATION"
 
 
 @dataclass

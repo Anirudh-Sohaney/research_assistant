@@ -33,6 +33,7 @@ from overlay_ui.models import CardType, PopupCardPayload, PopupItem, ScreenRect
 from overlay_ui.overlay import OverlayUIManager
 from overlay_ui.pyqt_synonym_overlay import get_synonym_overlay_bridge
 from overlay_ui.reword_overlay import get_reword_overlay_bridge
+from engines.citation_engine.overlay import get_citation_overlay_bridge
 from paper_analysis.analysis import analyze_paper
 from paper_analysis.overlay import get_paper_analysis_bridge
 from paper_discovery.discovery import discover_similar_papers
@@ -87,6 +88,63 @@ class AppOrchestrator:
         self._reword_generation = 0
         self._paper_analysis_bridge = None
         self._paper_analysis_generation = 0
+        self._citation_bridge = None
+        self._citation_bridge_connected = False
+        self._citation_selected_text = ""
+        self._citation_target_hwnd: Optional[int] = None
+        self._citation_generation = 0
+
+    def _configure_citation_overlay(self):
+        bridge = get_citation_overlay_bridge()
+        if bridge is None:
+            return None
+        if not self._citation_bridge_connected:
+            bridge.citation_applied.connect(self._apply_citation_result)
+            self._citation_bridge_connected = True
+        self._citation_bridge = bridge
+        return bridge
+
+    def _open_citation_popup(self, selected_text: str, target_hwnd: Optional[int]):
+        bridge = self._configure_citation_overlay()
+        if bridge is None:
+            return False
+        self._citation_selected_text = selected_text
+        self._citation_target_hwnd = target_hwnd
+        self._citation_generation += 1
+        generation = self._citation_generation
+        bridge.sig_show_loading.emit(selected_text, target_hwnd)
+
+        def worker():
+            try:
+                from engines.citation_engine.service import CitationService
+                service = CitationService()
+                result = _run_async(service.cite(selected_text))
+                if generation == self._citation_generation:
+                    if result and result.metadata and result.metadata.is_sufficient():
+                        bridge.sig_show_result.emit(result, target_hwnd)
+                    else:
+                        bridge.sig_show_error.emit(selected_text)
+            except Exception as exc:
+                log.error("Citation lookup failed: %s", exc)
+                if generation == self._citation_generation:
+                    bridge.sig_show_error.emit(str(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    def _apply_citation_result(self, formatted_text: str):
+        if not formatted_text:
+            return
+        if self._citation_target_hwnd and sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.user32.SetForegroundWindow(self._citation_target_hwnd)
+                time.sleep(0.05)
+            except Exception:
+                pass
+        inject_text_replacement(formatted_text)
+        if self._citation_bridge:
+            self._citation_bridge.sig_close.emit()
 
     def _configure_paper_analysis_overlay(self):
         bridge = get_paper_analysis_bridge()
@@ -263,6 +321,7 @@ class AppOrchestrator:
         log.info("Initializing Research Aid application session: %s", session_id)
         # Pre-warmed by main.py; connect GUI signals before worker hotkeys arrive.
         self._configure_reword_overlay()
+        self._configure_citation_overlay()
 
         # 1. Start daemon supervisor
         daemon_status = self.daemon_supervisor.start(DaemonConfig())
@@ -291,6 +350,7 @@ class AppOrchestrator:
                     "evidence": ActionTrigger.RETRIEVE_EVIDENCE,
                     "source_summary": ActionTrigger.SUMMARIZE_SOURCE,
                     "paper_analysis": ActionTrigger.ANALYZE_PAPER,
+                    "citation": ActionTrigger.CITE_SOURCE,
                 }
                 if event.action == "reword_popup":
                     payload = extract_selection()
@@ -300,6 +360,15 @@ class AppOrchestrator:
                     print(f"[SELECTION] Text: '{payload.selected_text}'", flush=True)
                     opened = self._open_reword_popup(payload.selected_text, target_hwnd)
                     print("[STATUS] Opened interactive reword popup." if opened else "[STATUS] Reword popup unavailable.", flush=True)
+                    return
+                if event.action == "citation_popup":
+                    payload = extract_selection()
+                    if payload is None or not payload.selected_text or not payload.selected_text.strip():
+                        print("[SELECTION] No text currently highlighted in active window.", flush=True)
+                        return
+                    print(f"[SELECTION] Text: '{payload.selected_text}'", flush=True)
+                    opened = self._open_citation_popup(payload.selected_text, target_hwnd)
+                    print("[STATUS] Opened interactive citation popup." if opened else "[STATUS] Citation popup unavailable.", flush=True)
                     return
                 if event.action == "paper_analysis":
                     payload = extract_selection()
@@ -342,6 +411,7 @@ class AppOrchestrator:
             "paper_discovery": True,
             "source_summary": True,
             "paper_analysis": True,
+            "citation_engine": True,
         }
 
         self.context = AppRuntimeContext(
@@ -674,6 +744,27 @@ class AppOrchestrator:
                     data=summary_res,
                 )
 
+            elif action == ActionTrigger.CITE_SOURCE:
+                from engines.citation_engine.service import CitationService
+                service = CitationService()
+                cite_res = _run_async(service.cite(text))
+                injected = False
+                if cite_res and cite_res.bibliography_entry:
+                    inj_res = inject_text_replacement(cite_res.bibliography_entry)
+                    injected = inj_res.success
+
+                elapsed = (time.monotonic() - start_time) * 1000.0
+                return ActionResult(
+                    success=True,
+                    action=action,
+                    latency_ms=round(elapsed, 2),
+                    tokens_used=0,
+                    tier="TIER_1_LOCAL",
+                    output_summary=f"Cited '{cite_res.metadata.title}' in APA format.",
+                    injected=injected,
+                    data=cite_res,
+                )
+
             else:
                 elapsed = (time.monotonic() - start_time) * 1000.0
                 return ActionResult(
@@ -738,6 +829,13 @@ class AppOrchestrator:
 
         try:
             bridge = get_reword_overlay_bridge()
+            if bridge:
+                bridge.sig_close.emit()
+        except Exception:
+            pass
+
+        try:
+            bridge = get_citation_overlay_bridge()
             if bridge:
                 bridge.sig_close.emit()
         except Exception:
