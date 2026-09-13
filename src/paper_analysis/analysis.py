@@ -53,8 +53,8 @@ class PaperAnalysisResult:
     tokens_used: int
 
 
-def _curved_score(raw_score: object) -> int:
-    """Map the judge's quality estimate onto a forgiving 50-100 quality curve."""
+def _score_quality(raw_score: object) -> int:
+    """Map the judge's quality estimate onto a forgiving 50-100 quality scale."""
     try:
         raw = max(1.0, min(100.0, float(raw_score)))
     except (TypeError, ValueError):
@@ -137,7 +137,7 @@ async def _run_judge(name: str, rubric: str, selected_text: str) -> JudgeResult:
                     findings.append(Finding(excerpt, issue, fix))
             if len(findings) < 3:
                 raise ValueError("judge returned fewer than 3 actionable findings")
-            return JudgeResult(name, _curved_score(parsed.get("score")), findings[:6], tokens_used=total_tokens)
+            return JudgeResult(name, _score_quality(parsed.get("score")), findings[:6], tokens_used=total_tokens)
         except Exception as exc:
             last_error = str(exc)
     return JudgeResult(name, None, error=last_error, tokens_used=total_tokens)

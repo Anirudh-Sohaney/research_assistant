@@ -17,7 +17,7 @@ def _response(name: str, score: int = 84):
 
 
 @pytest.mark.asyncio
-async def test_eight_full_text_judges_run_and_return_curved_scores():
+async def test_eight_full_text_judges_run_and_return_scores():
     paper = "The study evaluates a reproducible method on a carefully described benchmark dataset."
     with patch("paper_analysis.analysis.dispatch_api_request", side_effect=[_response(name) for name in JUDGE_RUBRICS]):
         result = await analyze_paper(paper)

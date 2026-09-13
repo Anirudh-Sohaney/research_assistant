@@ -23,4 +23,4 @@ Each judge must return strict JSON with a raw score and 3–6 findings. Findings
 
 ## UI navigation
 
-The overlay uses one content section. It lists judges as they complete; selecting a row replaces the list with the judge's score, excerpts, issues, and repair instructions. `Backspace` returns to the list and `Esc` closes the overlay.
+The overlay uses one content section. It lists judges as they complete; selecting a row replaces the list with a compact, structured view containing the score, selected text, problem, and recommended fix for each finding. `Backspace` returns to the list and `Esc` closes the overlay.

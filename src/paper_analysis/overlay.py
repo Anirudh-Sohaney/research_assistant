@@ -47,7 +47,8 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
 
     def _position(self):
         screen = QtGui.QGuiApplication.primaryScreen().availableGeometry()
-        self.setGeometry(screen.x() + screen.width() - 520, screen.y() + 80, 500, 700)
+        height = 520
+        self.setGeometry(screen.x() + screen.width() - 520, screen.y() + (screen.height() - height) // 2, 500, height)
 
     def show_loading(self):
         self._judges.clear()
@@ -70,7 +71,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self._position(); self.show(); self.raise_(); self.activateWindow()
 
     def show_complete(self, result: PaperAnalysisResult):
-        self.status.setText(f"OVERALL CURVED SCORE: {result.overall_score if result.overall_score is not None else '--'} / 100")
+        self.status.setText(f"OVERALL SCORE: {result.overall_score if result.overall_score is not None else '--'} / 100")
         self.footer.setText("CLICK A JUDGE FOR DETAILS   [BACKSPACE] BACK   [ESC] CLOSE")
         self._position(); self.show(); self.raise_(); self.activateWindow(); self.setFocus()
 
@@ -91,9 +92,15 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         if judge.error:
             self.detail.setPlainText(f"{judge.name}\n\nERROR: {judge.error}")
         else:
-            lines = [f"{judge.name} — CURVED SCORE {judge.score}/100", ""]
+            lines = [judge.name.upper(), f"SCORE: {judge.score}/100", "", "DETAILED FINDINGS", ""]
             for number, finding in enumerate(judge.findings, 1):
-                lines.extend([f"{number}. EXCERPT: {finding.excerpt}", f"ISSUE: {finding.issue}", f"FIX: {finding.fix}", ""])
+                lines.extend([
+                    f"FINDING {number}",
+                    f"SELECTED TEXT\n{finding.excerpt}",
+                    f"PROBLEM\n{finding.issue}",
+                    f"RECOMMENDED FIX\n{finding.fix}",
+                    "",
+                ])
             self.detail.setPlainText("\n".join(lines))
         self.content.setCurrentWidget(self.detail)
         self.footer.setText("[BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
