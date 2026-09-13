@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from citation_engine.cache import CitationCache
 from citation_engine.extractors.crossref import CrossrefExtractor
+from citation_engine.extractors.headless import HeadlessBrowserExtractor
 from citation_engine.extractors.meta_jsonld import MetaJsonLdExtractor
 from citation_engine.extractors.openlibrary import OpenLibraryExtractor
 from citation_engine.models import (
@@ -18,6 +19,10 @@ from citation_engine.models import (
 from citation_engine.normalizer import clean_doi, clean_isbn, clean_url
 from citation_engine.renderers.apa import APA7Renderer
 from citation_engine.renderers.base import BaseStyleRenderer
+from citation_engine.renderers.bibtex import BibTeXRenderer
+from citation_engine.renderers.chicago import ChicagoRenderer
+from citation_engine.renderers.ieee import IEEERenderer
+from citation_engine.renderers.mla import MLA9Renderer
 
 log = logging.getLogger("citation_engine.service")
 
@@ -34,10 +39,15 @@ class CitationService:
         self.crossref = CrossrefExtractor(timeout_secs=timeout_secs)
         self.openlibrary = OpenLibraryExtractor(timeout_secs=timeout_secs)
         self.meta_jsonld = MetaJsonLdExtractor(timeout_secs=timeout_secs)
+        self.headless = HeadlessBrowserExtractor(timeout_secs=timeout_secs)
 
-        # Style renderers registry
+        # Style renderers registry: variations on the same schema
         self._renderers: Dict[CitationStyle, BaseStyleRenderer] = {
             CitationStyle.APA: APA7Renderer(),
+            CitationStyle.MLA: MLA9Renderer(),
+            CitationStyle.CHICAGO: ChicagoRenderer(),
+            CitationStyle.IEEE: IEEERenderer(),
+            CitationStyle.BIBTEX: BibTeXRenderer(),
         }
 
     def register_renderer(self, style: CitationStyle, renderer: BaseStyleRenderer):
@@ -82,7 +92,15 @@ class CitationService:
                     self.cache.set(clean_target_url, meta)
                     return meta
 
+            # Cheap static streaming fetch first
             meta = await self.meta_jsonld.extract(clean_target_url)
+
+            # 5. Headless-browser fallback added last, only when cheap static paths fail
+            if (meta is None or not meta.is_sufficient()) and self.headless.can_handle(clean_target_url):
+                headless_meta = await self.headless.extract(clean_target_url)
+                if headless_meta:
+                    meta = headless_meta
+
             if meta:
                 # If extracted metadata discovered a DOI that Crossref can enhance
                 if meta.doi and not meta.authors:
