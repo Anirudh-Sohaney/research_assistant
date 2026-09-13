@@ -6,23 +6,23 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
-from citation_engine.cache import CitationCache
-from citation_engine.extractors.crossref import CrossrefExtractor
-from citation_engine.extractors.headless import HeadlessBrowserExtractor
-from citation_engine.extractors.meta_jsonld import MetaJsonLdExtractor
-from citation_engine.extractors.openlibrary import OpenLibraryExtractor
-from citation_engine.models import (
+from engines.citation_engine.cache import CitationCache
+from engines.citation_engine.extractors.crossref import CrossrefExtractor
+from engines.citation_engine.extractors.headless import HeadlessBrowserExtractor
+from engines.citation_engine.extractors.meta_jsonld import MetaJsonLdExtractor
+from engines.citation_engine.extractors.openlibrary import OpenLibraryExtractor
+from engines.citation_engine.models import (
     CitationResult,
     CitationStyle,
     ReferenceMetadata,
 )
-from citation_engine.normalizer import clean_doi, clean_isbn, clean_url
-from citation_engine.renderers.apa import APA7Renderer
-from citation_engine.renderers.base import BaseStyleRenderer
-from citation_engine.renderers.bibtex import BibTeXRenderer
-from citation_engine.renderers.chicago import ChicagoRenderer
-from citation_engine.renderers.ieee import IEEERenderer
-from citation_engine.renderers.mla import MLA9Renderer
+from engines.citation_engine.normalizer import clean_doi, clean_isbn, clean_url
+from engines.citation_engine.renderers.apa import APA7Renderer
+from engines.citation_engine.renderers.base import BaseStyleRenderer
+from engines.citation_engine.renderers.bibtex import BibTeXRenderer
+from engines.citation_engine.renderers.chicago import ChicagoRenderer
+from engines.citation_engine.renderers.ieee import IEEERenderer
+from engines.citation_engine.renderers.mla import MLA9Renderer
 
 log = logging.getLogger("citation_engine.service")
 

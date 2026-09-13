@@ -10,15 +10,15 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import httpx
 
-from citation_engine.extractors.base import BaseExtractor
-from citation_engine.models import (
+from engines.citation_engine.extractors.base import BaseExtractor
+from engines.citation_engine.models import (
     Author,
     CitationDate,
     FieldConfidence,
     ReferenceMetadata,
     SourceType,
 )
-from citation_engine.normalizer import (
+from engines.citation_engine.normalizer import (
     clean_doi,
     clean_isbn,
     clean_url,

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from citation_engine.models import Author, ReferenceMetadata, SourceType
-from citation_engine.renderers.base import BaseStyleRenderer
-from citation_engine.renderers.mla import to_title_case
+from engines.citation_engine.models import Author, ReferenceMetadata, SourceType
+from engines.citation_engine.renderers.base import BaseStyleRenderer
+from engines.citation_engine.renderers.mla import to_title_case
 
 
 class IEEERenderer(BaseStyleRenderer):

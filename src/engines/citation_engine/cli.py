@@ -13,8 +13,8 @@ import argparse
 import asyncio
 import sys
 
-from citation_engine.models import CitationStyle
-from citation_engine.service import CitationService
+from engines.citation_engine.models import CitationStyle
+from engines.citation_engine.service import CitationService
 
 
 def format_colored(text: str, color_code: str) -> str:

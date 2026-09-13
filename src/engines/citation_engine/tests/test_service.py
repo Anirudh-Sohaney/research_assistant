@@ -2,10 +2,10 @@
 
 import asyncio
 
-from citation_engine.cache import CitationCache
-from citation_engine.models import Author, CitationDate, CitationStyle, ReferenceMetadata, SourceType
-from citation_engine.renderers.base import BaseStyleRenderer
-from citation_engine.service import CitationService
+from engines.citation_engine.cache import CitationCache
+from engines.citation_engine.models import Author, CitationDate, CitationStyle, ReferenceMetadata, SourceType
+from engines.citation_engine.renderers.base import BaseStyleRenderer
+from engines.citation_engine.service import CitationService
 
 
 def test_citation_service_cache_hit():

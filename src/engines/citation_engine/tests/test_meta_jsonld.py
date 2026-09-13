@@ -2,8 +2,8 @@
 
 import pytest
 
-from citation_engine.extractors.meta_jsonld import HeadHTMLParser, MetaJsonLdExtractor
-from citation_engine.models import FieldConfidence, SourceType
+from engines.citation_engine.extractors.meta_jsonld import HeadHTMLParser, MetaJsonLdExtractor
+from engines.citation_engine.models import FieldConfidence, SourceType
 
 
 def test_head_html_parser():

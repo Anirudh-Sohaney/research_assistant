@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
-from citation_engine.models import Author, ReferenceMetadata, SourceType
-from citation_engine.renderers.base import BaseStyleRenderer
+from engines.citation_engine.models import Author, ReferenceMetadata, SourceType
+from engines.citation_engine.renderers.base import BaseStyleRenderer
 
 
 class BibTeXRenderer(BaseStyleRenderer):

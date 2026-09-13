@@ -7,7 +7,7 @@ import re
 import urllib.parse
 from typing import List, Optional, Tuple
 
-from citation_engine.models import Author, CitationDate
+from engines.citation_engine.models import Author, CitationDate
 
 # Curated keywords identifying institutional / corporate bodies (should not be inverted)
 CORPORATE_KEYWORDS = {

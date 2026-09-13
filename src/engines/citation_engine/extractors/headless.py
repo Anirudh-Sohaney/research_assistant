@@ -10,10 +10,10 @@ import importlib.util
 import logging
 from typing import Optional
 
-from citation_engine.extractors.base import BaseExtractor
-from citation_engine.extractors.meta_jsonld import HeadHTMLParser, MetaJsonLdExtractor
-from citation_engine.models import FieldConfidence, ReferenceMetadata
-from citation_engine.normalizer import clean_url
+from engines.citation_engine.extractors.base import BaseExtractor
+from engines.citation_engine.extractors.meta_jsonld import HeadHTMLParser, MetaJsonLdExtractor
+from engines.citation_engine.models import FieldConfidence, ReferenceMetadata
+from engines.citation_engine.normalizer import clean_url
 
 log = logging.getLogger("citation_engine.headless")
 

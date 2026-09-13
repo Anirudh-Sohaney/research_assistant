@@ -2,8 +2,8 @@
 
 import pytest
 
-from citation_engine.extractors.crossref import CrossrefExtractor
-from citation_engine.models import SourceType
+from engines.citation_engine.extractors.crossref import CrossrefExtractor
+from engines.citation_engine.models import SourceType
 
 
 def test_map_message_to_metadata():

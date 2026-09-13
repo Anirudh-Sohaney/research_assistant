@@ -3,9 +3,9 @@
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from citation_engine.extractors.headless import HeadlessBrowserExtractor
-from citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
-from citation_engine.service import CitationService
+from engines.citation_engine.extractors.headless import HeadlessBrowserExtractor
+from engines.citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
+from engines.citation_engine.service import CitationService
 
 
 def test_headless_is_available_guard():

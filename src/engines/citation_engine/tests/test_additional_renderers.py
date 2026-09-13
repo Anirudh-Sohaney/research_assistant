@@ -1,10 +1,10 @@
 """Tests for additional citation styles: MLA 9th, Chicago 17th, IEEE, and BibTeX."""
 
-from citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
-from citation_engine.renderers.bibtex import BibTeXRenderer
-from citation_engine.renderers.chicago import ChicagoRenderer
-from citation_engine.renderers.ieee import IEEERenderer
-from citation_engine.renderers.mla import MLA9Renderer
+from engines.citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
+from engines.citation_engine.renderers.bibtex import BibTeXRenderer
+from engines.citation_engine.renderers.chicago import ChicagoRenderer
+from engines.citation_engine.renderers.ieee import IEEERenderer
+from engines.citation_engine.renderers.mla import MLA9Renderer
 
 
 def test_mla_single_and_two_authors():

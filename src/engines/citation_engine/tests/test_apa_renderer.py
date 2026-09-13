@@ -1,7 +1,7 @@
 """Tests for APA 7th Edition style renderer."""
 
-from citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
-from citation_engine.renderers.apa import APA7Renderer, to_sentence_case
+from engines.citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
+from engines.citation_engine.renderers.apa import APA7Renderer, to_sentence_case
 
 
 def test_to_sentence_case():

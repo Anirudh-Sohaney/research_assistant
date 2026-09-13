@@ -6,8 +6,8 @@ import calendar
 import re
 from typing import List, Optional
 
-from citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
-from citation_engine.renderers.base import BaseStyleRenderer
+from engines.citation_engine.models import Author, CitationDate, ReferenceMetadata, SourceType
+from engines.citation_engine.renderers.base import BaseStyleRenderer
 
 
 def to_sentence_case(title: str) -> str:

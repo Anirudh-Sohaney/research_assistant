@@ -1,7 +1,7 @@
 """Tests for metadata normalizer and sanitization functions."""
 
-from citation_engine.models import Author, CitationDate
-from citation_engine.normalizer import (
+from engines.citation_engine.models import Author, CitationDate
+from engines.citation_engine.normalizer import (
     clean_doi,
     clean_isbn,
     clean_url,

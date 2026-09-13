@@ -8,15 +8,15 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from citation_engine.extractors.base import BaseExtractor
-from citation_engine.models import (
+from engines.citation_engine.extractors.base import BaseExtractor
+from engines.citation_engine.models import (
     Author,
     CitationDate,
     FieldConfidence,
     ReferenceMetadata,
     SourceType,
 )
-from citation_engine.normalizer import clean_doi, parse_authors_list, sanitize_title
+from engines.citation_engine.normalizer import clean_doi, parse_authors_list, sanitize_title
 
 log = logging.getLogger("citation_engine.crossref")
 

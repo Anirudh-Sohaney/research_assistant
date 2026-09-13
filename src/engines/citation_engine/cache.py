@@ -9,8 +9,8 @@ import os
 import time
 from typing import Dict, Optional, Tuple
 
-from citation_engine.models import Author, CitationDate, FieldConfidence, ReferenceMetadata, SourceType
-from citation_engine.normalizer import clean_doi, clean_isbn, clean_url
+from engines.citation_engine.models import Author, CitationDate, FieldConfidence, ReferenceMetadata, SourceType
+from engines.citation_engine.normalizer import clean_doi, clean_isbn, clean_url
 
 log = logging.getLogger("citation_engine.cache")
 
