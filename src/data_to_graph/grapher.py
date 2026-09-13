@@ -16,16 +16,27 @@ import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Configure modern, aesthetic sans-serif typography across all charts
+# Configure modern, aesthetic sans-serif typography & high-res rendering across all charts
 matplotlib.rcParams["font.sans-serif"] = [
     "Segoe UI", "Inter", "Arial", "Helvetica Neue", "DejaVu Sans"
 ]
 matplotlib.rcParams["font.family"] = "sans-serif"
+matplotlib.rcParams["axes.labelweight"] = "bold"
+matplotlib.rcParams["axes.titleweight"] = "bold"
+matplotlib.rcParams["axes.labelsize"] = 10.5
+matplotlib.rcParams["axes.titlesize"] = 13.0
+matplotlib.rcParams["xtick.labelsize"] = 9.0
+matplotlib.rcParams["ytick.labelsize"] = 9.0
+matplotlib.rcParams["figure.dpi"] = 300
+matplotlib.rcParams["savefig.dpi"] = 300
+matplotlib.rcParams["lines.antialiased"] = True
+matplotlib.rcParams["patch.antialiased"] = True
+matplotlib.rcParams["text.antialiased"] = True
 matplotlib.rcParams["axes.edgecolor"] = "#CBD5E1"
-matplotlib.rcParams["axes.linewidth"] = 0.8
+matplotlib.rcParams["axes.linewidth"] = 0.9
 matplotlib.rcParams["grid.color"] = "#F1F5F9"
 matplotlib.rcParams["grid.linestyle"] = "--"
-matplotlib.rcParams["grid.alpha"] = 0.8
+matplotlib.rcParams["grid.alpha"] = 0.85
 
 from data_to_graph.models import (
     ChartStyleConfig,
@@ -577,6 +588,8 @@ class TableGraphEngine:
             ax.set_ylabel(
                 cfg.y_label or (f"{y_col_title} ({y_unit})" if y_unit and f"({y_unit})" not in y_col_title else y_col_title),
                 color=text_color,
+                fontweight="bold",
+                fontsize=10.5,
             )
             if n_series > 1:
                 ax.legend(frameon=True, facecolor=ax_bg_color, edgecolor=grid_color, fontsize=8)
@@ -595,6 +608,8 @@ class TableGraphEngine:
             ax.set_xlabel(
                 cfg.y_label or (f"{y_col} ({y_unit})" if y_unit and f"({y_unit})" not in y_col else y_col),
                 color=text_color,
+                fontweight="bold",
+                fontsize=10.5,
             )
             max_v = max(y_vals) if y_vals and max(y_vals) > 0 else 1.0
             for i, v in enumerate(y_vals):
@@ -641,6 +656,8 @@ class TableGraphEngine:
             ax.set_ylabel(
                 cfg.y_label or (f"{active_y_cols[0]} ({y_unit})" if y_unit and f"({y_unit})" not in active_y_cols[0] else active_y_cols[0]),
                 color=text_color,
+                fontweight="bold",
+                fontsize=10.5,
             )
             if len(active_y_cols) > 1:
                 ax.legend(frameon=True, facecolor=ax_bg_color, edgecolor=grid_color, fontsize=8)
@@ -654,43 +671,88 @@ class TableGraphEngine:
             x_nums = [float(r[x_c_idx]) if isinstance(r[x_c_idx], (int, float)) else i for i, r in enumerate(dataset.rows)]
             y_nums = [float(r[y_idx]) if isinstance(r[y_idx], (int, float)) else 0.0 for r in dataset.rows]
 
-            ax.scatter(
-                x_nums,
-                y_nums,
-                color=colors[1 % len(colors)],
-                s=65,
-                edgecolors=bg_color,
-                linewidth=0.8,
-                alpha=0.9,
-                zorder=4,
-            )
-
-            if cat_cols and len(dataset.rows) <= 15:
-                cat_idx = dataset.columns.index(cat_cols[0])
-                for i, r in enumerate(dataset.rows):
-                    label = str(r[cat_idx])
-                    if label:
-                        ax.annotate(
-                            label,
-                            (x_nums[i], y_nums[i]),
-                            xytext=(4, 4),
-                            textcoords="offset points",
-                            fontsize=7.5,
-                            color=text_color,
-                            alpha=0.85,
-                        )
-
+            # Fit trendline first so point annotations can be positioned away from the line
+            trend_fit = None
             if len(x_nums) >= 3 and len(set(x_nums)) > 1:
                 try:
                     slope, intercept = np.polyfit(x_nums, y_nums, 1)
                     x_trend = np.linspace(min(x_nums), max(x_nums), 50)
                     y_trend = slope * x_trend + intercept
-                    ax.plot(x_trend, y_trend, linestyle="--", color=colors[0], alpha=0.5, linewidth=1.2, zorder=2)
+                    ax.plot(
+                        x_trend,
+                        y_trend,
+                        linestyle="--",
+                        color=colors[0],
+                        alpha=0.6,
+                        linewidth=1.6,
+                        zorder=2,
+                    )
+                    trend_fit = (slope, intercept)
                 except Exception:
                     pass
 
-            ax.set_xlabel(cfg.x_label or x_num_col, color=text_color)
-            ax.set_ylabel(cfg.y_label or y_col, color=text_color)
+            ax.scatter(
+                x_nums,
+                y_nums,
+                color=colors[1 % len(colors)],
+                s=75,
+                edgecolors="#FFFFFF",
+                linewidth=1.6,
+                alpha=0.9,
+                zorder=4,
+            )
+
+            # Prevent clipping of points and badge text
+            ax.margins(x=0.14, y=0.16)
+
+            if cat_cols and len(dataset.rows) <= 20:
+                cat_idx = dataset.columns.index(cat_cols[0])
+                for i, r in enumerate(dataset.rows):
+                    label = str(r[cat_idx])
+                    if not label:
+                        continue
+
+                    # Direct collision avoidance with trendline:
+                    # If point is above or on the line, push text further above.
+                    # If point is below the line, push text further below.
+                    if trend_fit is not None:
+                        line_y_at_x = trend_fit[0] * x_nums[i] + trend_fit[1]
+                        if y_nums[i] >= line_y_at_x:
+                            y_offset = 9
+                            va = "bottom"
+                        else:
+                            y_offset = -14
+                            va = "top"
+                    else:
+                        y_offset = 9 if (i % 2 == 0) else -14
+                        va = "bottom" if (i % 2 == 0) else "top"
+
+                    ax.annotate(
+                        label,
+                        (x_nums[i], y_nums[i]),
+                        xytext=(0, y_offset),
+                        textcoords="offset points",
+                        ha="center",
+                        va=va,
+                        fontsize=8.5,
+                        fontweight="bold",
+                        color=text_color,
+                        bbox=dict(
+                            boxstyle="round,pad=0.22,rounding_size=0.3",
+                            facecolor="#FFFFFF",
+                            edgecolor="#CBD5E1",
+                            linewidth=0.7,
+                            alpha=0.94,
+                        ),
+                        zorder=5,
+                    )
+
+            x_unit = dataset.column_units.get(x_num_col, "")
+            y_unit = dataset.column_units.get(y_col, "")
+            x_title = f"{x_num_col} ({x_unit})" if x_unit and f"({x_unit})" not in x_num_col else x_num_col
+            y_title = f"{y_col} ({y_unit})" if y_unit and f"({y_unit})" not in y_col else y_col
+            ax.set_xlabel(cfg.x_label or x_title, color=text_color, fontweight="bold", fontsize=10.5)
+            ax.set_ylabel(cfg.y_label or y_title, color=text_color, fontweight="bold", fontsize=10.5)
 
         elif target_type == ChartType.HISTOGRAM:
             target_col = num_cols[0] if num_cols else dataset.columns[0]
@@ -700,8 +762,8 @@ class TableGraphEngine:
                 vals = [0.0]
             bins = max(3, min(25, int(math.sqrt(len(vals)))))
             ax.hist(vals, bins=bins, color=colors[2 % len(colors)], edgecolor=bg_color, alpha=0.85, zorder=3)
-            ax.set_xlabel(cfg.x_label or target_col, color=text_color)
-            ax.set_ylabel("Frequency", color=text_color)
+            ax.set_xlabel(cfg.x_label or target_col, color=text_color, fontweight="bold", fontsize=10.5)
+            ax.set_ylabel("Frequency", color=text_color, fontweight="bold", fontsize=10.5)
 
         elif target_type == ChartType.BOX_PLOT:
             active_cols = num_cols[:5] if num_cols else dataset.columns[1:6]
@@ -725,7 +787,7 @@ class TableGraphEngine:
                 for patch in bp["boxes"]:
                     patch.set_facecolor(colors[0])
                     patch.set_alpha(0.7)
-            ax.set_ylabel(cfg.y_label or "Distribution", color=text_color)
+            ax.set_ylabel(cfg.y_label or "Distribution", color=text_color, fontweight="bold", fontsize=10.5)
 
         elif target_type == ChartType.HEATMAP:
             active_cols = num_cols[:8] if num_cols else dataset.columns[1:9]
@@ -773,7 +835,7 @@ class TableGraphEngine:
 
             ax.set_xticks(x_indices)
             ax.set_xticklabels(x_vals)
-            ax.set_ylabel(cfg.y_label or active_y_cols[0], color=text_color)
+            ax.set_ylabel(cfg.y_label or active_y_cols[0], color=text_color, fontweight="bold", fontsize=10.5)
             if len(active_y_cols) > 1:
                 ax.legend(frameon=True, facecolor=ax_bg_color, edgecolor=grid_color, fontsize=8)
 
@@ -880,7 +942,7 @@ class TableGraphEngine:
 
             ax.set_xticks(indices)
             ax.set_xticklabels(x_vals)
-            ax.set_ylabel(cfg.y_label or "Total", color=text_color)
+            ax.set_ylabel(cfg.y_label or "Total", color=text_color, fontweight="bold", fontsize=10.5)
             ax.legend(frameon=True, facecolor=ax_bg_color, edgecolor=grid_color, fontsize=8)
 
         elif target_type == ChartType.STACKED_AREA:
@@ -904,7 +966,7 @@ class TableGraphEngine:
             )
             ax.set_xticks(x_indices)
             ax.set_xticklabels(x_vals)
-            ax.set_ylabel(cfg.y_label or "Cumulative Total", color=text_color)
+            ax.set_ylabel(cfg.y_label or "Cumulative Total", color=text_color, fontweight="bold", fontsize=10.5)
             ax.legend(frameon=True, facecolor=ax_bg_color, edgecolor=grid_color, fontsize=8)
 
         elif target_type == ChartType.BUBBLE_CHART:
@@ -1073,7 +1135,7 @@ class TableGraphEngine:
 
             ax.set_xticks(indices_w)
             ax.set_xticklabels(labels_w)
-            ax.set_ylabel(cfg.y_label or y_col, color=text_color)
+            ax.set_ylabel(cfg.y_label or y_col, color=text_color, fontweight="bold", fontsize=10.5)
 
         elif target_type == ChartType.GANTT_CHART:
             from data_to_graph.chart_selector import _find_col_by_keywords, GANTT_START_KEYWORDS, GANTT_END_KEYWORDS
@@ -1101,7 +1163,7 @@ class TableGraphEngine:
             ax.set_yticks(y_pos_g)
             ax.set_yticklabels(tasks, color=text_color)
             ax.invert_yaxis()
-            ax.set_xlabel(cfg.x_label or "Timeline / Duration", color=text_color)
+            ax.set_xlabel(cfg.x_label or "Timeline / Duration", color=text_color, fontweight="bold", fontsize=10.5)
 
         elif target_type == ChartType.FUNNEL_CHART:
             stage_col = cat_cols[0] if cat_cols else dataset.columns[0]
@@ -1127,7 +1189,7 @@ class TableGraphEngine:
             ax.set_yticks([])
             ax.invert_yaxis()
             ax.set_xlim(-max_val * 0.7, max_val * 0.7)
-            ax.set_xlabel("Funnel Conversion Volume", color=text_color)
+            ax.set_xlabel("Funnel Conversion Volume", color=text_color, fontweight="bold", fontsize=10.5)
 
         elif target_type == ChartType.CANDLESTICK_CHART:
             from data_to_graph.chart_selector import _find_col_by_keywords
@@ -1153,7 +1215,7 @@ class TableGraphEngine:
 
             ax.set_xticks(x_idx_c)
             ax.set_xticklabels(x_vals)
-            ax.set_ylabel("Price / OHLC", color=text_color)
+            ax.set_ylabel("Price / OHLC", color=text_color, fontweight="bold", fontsize=10.5)
 
         elif target_type == ChartType.TREEMAP:
             ax.axis("off")
@@ -1268,9 +1330,9 @@ class TableGraphEngine:
                 chart_title = dataset.columns[0] if dataset.columns else "Table Data"
 
         if target_type == ChartType.PAIR_PLOT:
-            fig.suptitle(chart_title, fontsize=12, fontweight="bold", color=text_color)
+            fig.suptitle(chart_title, fontsize=13, fontweight="bold", color=text_color)
         else:
-            ax.set_title(chart_title, fontsize=12, fontweight="bold", pad=14, color=text_color)
+            ax.set_title(chart_title, fontsize=13, fontweight="bold", pad=16, color=text_color)
 
         # Set default x_label ONLY for Cartesian charts that haven't set their own specific x_label
         if target_type in (
@@ -1278,7 +1340,7 @@ class TableGraphEngine:
             ChartType.STACKED_BAR, ChartType.STACKED_AREA
         ):
             if not ax.get_xlabel():
-                ax.set_xlabel(x_label_text, color=text_color)
+                ax.set_xlabel(x_label_text, color=text_color, fontweight="bold", fontsize=10.5)
 
         if target_type not in (
             ChartType.PIE_CHART, ChartType.DONUT_CHART, ChartType.RADAR_CHART,
@@ -1288,8 +1350,8 @@ class TableGraphEngine:
                 ax.spines[spine].set_visible(False)
             for spine in ("bottom", "left"):
                 ax.spines[spine].set_color(spine_color)
-                ax.spines[spine].set_linewidth(0.8)
-            ax.tick_params(colors=text_color, labelsize=8.5)
+                ax.spines[spine].set_linewidth(0.9)
+            ax.tick_params(colors=text_color, labelsize=9.0)
 
         if target_type in (
             ChartType.BAR_CHART, ChartType.LINE_CHART, ChartType.AREA_CHART,
@@ -1301,8 +1363,8 @@ class TableGraphEngine:
 
         png_buf = io.BytesIO()
         svg_buf = io.StringIO()
-        fig.savefig(png_buf, format="png", dpi=cfg.dpi, bbox_inches="tight")
-        fig.savefig(svg_buf, format="svg", bbox_inches="tight")
+        fig.savefig(png_buf, format="png", dpi=cfg.dpi, bbox_inches="tight", pad_inches=0.15)
+        fig.savefig(svg_buf, format="svg", bbox_inches="tight", pad_inches=0.15)
         plt.close(fig)
 
         from data_to_graph.chart_selector import get_compatible_chart_types

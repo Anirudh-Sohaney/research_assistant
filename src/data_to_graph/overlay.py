@@ -173,7 +173,7 @@ class TableGraphOverlay(QtWidgets.QWidget):
         # Main title strictly matching table heading
         self._target = QtWidgets.QLabel("DATASET PREVIEW")
         self._target.setWordWrap(True)
-        self._target.setStyleSheet("color:#FFF; font: bold 13px Consolas; background:transparent;")
+        self._target.setStyleSheet("color:#FFF; font: bold 14px Consolas; background:transparent;")
         layout.addWidget(self._target)
 
         # Dataset group bar (if table has multiple segmented headings)
@@ -420,15 +420,20 @@ class TableGraphOverlay(QtWidgets.QWidget):
         # Populate type switcher buttons
         self._update_type_buttons(current_type)
 
-        # Render PNG image onto label
+        # Render PNG image onto label with high-DPI awareness
         pixmap = QtGui.QPixmap()
         pixmap.loadFromData(self._current_chart.png_bytes, "PNG")
         if not pixmap.isNull():
+            dpr = self.devicePixelRatioF() if hasattr(self, "devicePixelRatioF") else float(self.devicePixelRatio())
+            dpr = max(1.0, dpr)
+            target_w = int(500 * dpr)
+            target_h = int(320 * dpr)
             scaled = pixmap.scaled(
-                QtCore.QSize(490, 310),
+                QtCore.QSize(target_w, target_h),
                 QtCore.Qt.AspectRatioMode.KeepAspectRatio,
                 QtCore.Qt.TransformationMode.SmoothTransformation,
             )
+            scaled.setDevicePixelRatio(dpr)
             self._image_label.setPixmap(scaled)
 
         # Update metadata info
@@ -533,6 +538,9 @@ class TableGraphOverlay(QtWidgets.QWidget):
         image = QtGui.QImage()
         image.loadFromData(self._current_chart.png_bytes, "PNG")
         if not image.isNull():
+            # Set high-res print quality: 300 DPI = 11811 dots per meter
+            image.setDotsPerMeterX(11811)
+            image.setDotsPerMeterY(11811)
             mime.setImageData(image)
 
         # Format 2: CF_HDROP File Drop (Notion, Slack, Teams, Discord, Obsidian, GitHub)
