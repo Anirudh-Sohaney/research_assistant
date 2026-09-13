@@ -103,6 +103,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         judge = self._judges.get(name)
         if judge is None:
             return
+        self.explanations.blockSignals(True)
         self.explanations.clear()
         if judge.error:
             self.explanations.addItem(f"ERROR\n{judge.error}")
@@ -111,8 +112,8 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
                 item = QtWidgets.QListWidgetItem(f"EXPLANATION {number}\n{finding.explanation}")
                 item.setData(QtCore.Qt.ItemDataRole.UserRole, number - 1)
                 self.explanations.addItem(item)
-        self.explanations.blockSignals(True)
         self.explanations.setCurrentRow(-1)
+        self.explanations.clearSelection()
         self.explanations.blockSignals(False)
         self.content.setCurrentWidget(self.explanations)
         self.footer.setText("CLICK AN EXPLANATION FOR REPLACEMENT   [BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
