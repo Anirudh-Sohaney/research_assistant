@@ -1,7 +1,7 @@
 # Text Reword Documentation
 
 ## Module Overview
-`text_reword` rewrites highlighted sentences and paragraphs exclusively through OpenRouter's Nemotron model (`nvidia/nemotron-3-ultra-550b-a55b:free` by default) to improve academic tone, add detail, or simplify language while shielding citations and math expressions. The interactive Alt+P popup exposes these three modes and previews the generated replacement before injection. There is no hard-coded local rewrite fallback: unavailable, invalid, or unchanged model output is reported and can be retried with `R`.
+`text_reword` rewrites highlighted sentences and paragraphs exclusively through OpenRouter's Nemotron model (`nvidia/nemotron-3-ultra-550b-a55b:free` by default) to improve academic tone, add detail, or simplify language while shielding citations and math expressions. The interactive Alt+P popup exposes these three modes and previews the generated replacement before injection. There is no hard-coded local rewrite fallback: unavailable, timed-out, invalid, or unchanged model output is reported and can be retried with `R`. The reword request timeout is 120 seconds by default and can be overridden with `OPENROUTER_REWORD_TIMEOUT`.
 
 ## File Structure
 - `models.py`: Data classes (`RewordStyle`, `SurroundingContext`, `EntityMaskReport`, `RewordResult`).

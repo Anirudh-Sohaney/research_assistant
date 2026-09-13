@@ -24,6 +24,7 @@ DEFAULT_REWORD_MODEL = os.getenv(
     "OPENROUTER_REWORD_MODEL",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
 )
+DEFAULT_REWORD_TIMEOUT = float(os.getenv("OPENROUTER_REWORD_TIMEOUT", "120"))
 
 # Regex patterns for shielding citations and formulas
 CITATION_PATTERN = re.compile(
@@ -164,6 +165,7 @@ class TextRewordEngine:
                 "temperature": 0.4,
                 "reasoning": {"effort": "low", "exclude": True},
             },
+            timeout=DEFAULT_REWORD_TIMEOUT,
             max_tokens=max_tokens,
         )
 
