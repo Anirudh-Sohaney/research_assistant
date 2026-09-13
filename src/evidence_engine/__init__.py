@@ -1,46 +1,42 @@
-"""Evidence Engine v2 — public surface.
+"""Evidence Engine — Part 1: clean paper extraction from peer-reviewed sources.
 
-    from evidence_engine import supports, opposes
+Current status: Part 1 is implemented and verified. Later pipeline stages
+(claim decomposition, stance gating, LLM curation) are planned in the
+sections below and will be rebuilt one part at a time on top of this base.
 
-    result = supports("Regular aerobic exercise improves executive function in older adults")
-    for item in result.items:
-        print(item.stance.value, "|", item.paper.title, "|", item.quote)
+Part 1 contract (sources.py, models.py):
 
-See README.md for the full architecture plan and implementation status.
+    from evidence_engine import extract_papers_sync
+    result = extract_papers_sync("Multilayer perceptron is the dominant "
+                                 "choice of learning based solutions for "
+                                 "inverse kinematics")
+    result.papers        # list[PaperRef], deduplicated across sources
+    result.sources       # {"europepmc": {...}, "openalex": {...}, ...}
+    result.summary()     # "N unique papers in X ms [europepmc=15, ...]"
+
+Three peer-reviewed sources, fanned out in parallel under a deadline:
+Europe PMC (full-text BODY: search), OpenAlex (240M works), Semantic Scholar
+(200M works, best metadata). Never raises; every failure degrades to a
+per-source status. Successful fetches are disk-cached 6 h and served even
+when the network or a source is down.
 """
 
-from evidence_engine.models import (
-    CandidateSentence,
-    EvidenceItem,
-    EvidenceResult,
-    InvalidClaimError,
-    PaperRef,
-    PipelineMeta,
-    ScoredSentence,
-    Stance,
-    StanceScoredSentence,
+from evidence_engine.models import PaperRef, RetrievalResult, SourceReport
+from evidence_engine.sources import (
+    build_queries,
+    dedupe_papers,
+    extract_papers,
+    extract_papers_sync,
+    reconstruct_abstract,
 )
-from evidence_engine.pipeline import opposes, supports
-from evidence_engine import nli as _nli
-
-# Prewarm the NLI backend at import time (README section 8.2: "model warm at
-# app start"): download + ORT session + cold-start inference happen in a
-# daemon thread, completely off any supports()/opposes() call's SLA clock.
-# Tests and callers that need the backend synchronously call nli.ensure_loaded().
-import threading as _threading
-
-_threading.Thread(target=_nli.ensure_loaded, name="nli-prewarm", daemon=True).start()
 
 __all__ = [
-    "supports",
-    "opposes",
-    "Stance",
-    "EvidenceItem",
-    "EvidenceResult",
     "PaperRef",
-    "PipelineMeta",
-    "InvalidClaimError",
-    "CandidateSentence",
-    "ScoredSentence",
-    "StanceScoredSentence",
+    "RetrievalResult",
+    "SourceReport",
+    "build_queries",
+    "dedupe_papers",
+    "extract_papers",
+    "extract_papers_sync",
+    "reconstruct_abstract",
 ]

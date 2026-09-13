@@ -214,6 +214,9 @@ class PyQtSynonymOverlay(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self.on_apply_callback: Optional[Callable[[str], None]] = None
+        self._last_explicit_hide_ts: float = 0.0
+        self._keep_alive_timer: Optional[QtCore.QTimer] = None
+        self._allow_auto_hide: bool = False  # only Esc/Enter/system close may hide
 
         self.setWindowFlags(
             QtCore.Qt.WindowType.FramelessWindowHint
