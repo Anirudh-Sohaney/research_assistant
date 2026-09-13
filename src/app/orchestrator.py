@@ -82,6 +82,7 @@ class AppOrchestrator:
         self._reword_mode = ""
         self._reword_style = None
         self._reword_result = ""
+        self._reword_generation = 0
 
     def _configure_reword_overlay(self):
         """Connects the interactive reword popup once on the Qt application thread."""
@@ -104,6 +105,7 @@ class AppOrchestrator:
         self._reword_target_hwnd = target_hwnd
         self._reword_mode = ""
         self._reword_result = ""
+        self._reword_generation += 1
         bridge.sig_show_modes.emit(selected_text)
         return True
 
@@ -119,6 +121,7 @@ class AppOrchestrator:
             return
         self._reword_mode = mode
         self._reword_style = style_map[mode]
+        self._reword_result = ""
         self._generate_reword(bypass_cache=False)
 
     def _generate_reword(self, bypass_cache: bool):
@@ -128,6 +131,8 @@ class AppOrchestrator:
         bridge.sig_show_loading.emit(self._reword_mode)
         selected_text = self._reword_selected_text
         style = self._reword_style
+        self._reword_generation += 1
+        generation = self._reword_generation
 
         def worker():
             try:
@@ -138,6 +143,8 @@ class AppOrchestrator:
                         bypass_cache=bypass_cache,
                     )
                 )
+                if generation != self._reword_generation:
+                    return
                 self._reword_result = result.primary_replacement
                 bridge.sig_show_result.emit(
                     self._reword_result

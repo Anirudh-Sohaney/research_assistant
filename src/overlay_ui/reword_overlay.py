@@ -94,6 +94,7 @@ class RewordOverlay(QtWidgets.QWidget):
         self.showNormal(); self.show(); self.raise_(); self.activateWindow(); self.setFocus()
 
     def show_loading(self, mode: str):
+        self._result_page.clear()
         self._stack.setCurrentWidget(self._loading_page)
         self._loading_page.setText(f"LING // GENERATING\n\n  [ .. ]  {mode.upper()} DIRECTIVE")
         self._footer.setText("GENERATING WITH OPENROUTER LING   [ESC] CANCEL")

@@ -156,26 +156,31 @@ class TextRewordEngine:
             "Only transform the selected text; use context to resolve meaning."
         )
 
-        payload = RequestPayload(
-            method="POST",
-            json_body={
-                "model": DEFAULT_REWORD_MODEL,
-                "messages": [
-                    {"role": "system", "content": system_instruction},
-                    {"role": "user", "content": user_content},
-                ],
-                "temperature": 0.4,
-                "reasoning": {"effort": "low", "exclude": True},
-            },
-            timeout=DEFAULT_REWORD_TIMEOUT,
-            max_tokens=max_tokens,
-        )
-
-        resp = await dispatch_api_request(ExternalService.LLM_SERVICE, "/chat/completions", payload)
-
-        # 3. Process the OpenRouter response. Rewording is intentionally LLM-only;
-        # there is no local text substitution fallback.
-        if resp.is_success and isinstance(resp.data, dict):
+        # 3. Process OpenRouter responses. A bounded retry is still LLM-only: it
+        # handles transient empty/length-limited generations without inventing text locally.
+        last_error = "OpenRouter did not return a usable rewording."
+        total_tokens = 0
+        for attempt in range(2):
+            attempt_max_tokens = max_tokens if attempt == 0 else max_tokens + 800
+            payload = RequestPayload(
+                method="POST",
+                json_body={
+                    "model": DEFAULT_REWORD_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_content},
+                    ],
+                    "temperature": 0.4,
+                    "reasoning": {"effort": "low", "exclude": True},
+                },
+                timeout=DEFAULT_REWORD_TIMEOUT,
+                max_tokens=attempt_max_tokens,
+            )
+            resp = await dispatch_api_request(ExternalService.LLM_SERVICE, "/chat/completions", payload)
+            total_tokens += resp.tokens_consumed
+            if not resp.is_success or not isinstance(resp.data, dict):
+                last_error = resp.error or last_error
+                continue
             try:
                 message = resp.data["choices"][0].get("message", {})
                 content = message.get("content") or message.get("reasoning") or ""
@@ -195,27 +200,26 @@ class TextRewordEngine:
                     if alternate:
                         primary = alternate
                     else:
-                        # Never cache or report an unchanged LLM response as a successful rewrite.
                         raise ValueError("LLM returned unchanged text")
                 cache_llm_response(cache_key, json.dumps({"primary": parsed.get("primary", ""), "variants": parsed.get("variants", [])}))
                 return RewordResult(
                     primary_replacement=primary,
                     alternative_variants=variants,
-                    tokens_used=resp.tokens_consumed,
+                    tokens_used=total_tokens,
                     style_applied=style.value,
                     cached=False,
                 )
             except Exception as exc:
-                log.warning("LLM response parse error: %s", exc)
+                last_error = str(exc)
+                log.warning("LLM response parse error (attempt %s/2): %s", attempt + 1, exc)
 
-        error = resp.error or "OpenRouter did not return a usable rewording."
         return RewordResult(
             primary_replacement="",
             alternative_variants=[],
-            tokens_used=0,
+            tokens_used=total_tokens,
             style_applied=style.value,
             cached=False,
-            error=error,
+            error=last_error,
         )
 
     @staticmethod

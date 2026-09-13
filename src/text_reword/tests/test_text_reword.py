@@ -109,3 +109,57 @@ class TestRewordExecution:
         assert payload.json_body["model"] == "inclusionai/ling-3.0-flash-fin:free"
         assert "add useful detail" in payload.json_body["messages"][0]["content"]
         assert payload.json_body["reasoning"] == {"effort": "low", "exclude": True}
+
+    @patch("text_reword.reword.query_semantic_cache", return_value=None)
+    @patch("text_reword.reword.dispatch_api_request")
+    async def test_empty_first_generation_retries_and_returns_llm_output(self, mock_dispatch, mock_cache):
+        mock_dispatch.side_effect = [
+            ApiResponse(
+                status_code=200,
+                data={"choices": [{"message": {"content": None}}]},
+                latency_ms=20.0,
+                tokens_consumed=700,
+            ),
+            ApiResponse(
+                status_code=200,
+                data={"choices": [{"message": {"content": '{"primary":"The revised method produced stronger results.","variants":[]}'}}]},
+                latency_ms=20.0,
+                tokens_consumed=40,
+            ),
+        ]
+        result = await reword_text_segment(
+            "The method produced good results.",
+            style=RewordStyle.ACADEMIC_FORMAL,
+            bypass_cache=True,
+        )
+
+        assert result.primary_replacement == "The revised method produced stronger results."
+        assert result.error is None
+        assert mock_dispatch.call_count == 2
+
+    @patch("text_reword.reword.query_semantic_cache", return_value=None)
+    @patch("text_reword.reword.dispatch_api_request")
+    async def test_unchanged_first_generation_retries_instead_of_showing_source(self, mock_dispatch, mock_cache):
+        mock_dispatch.side_effect = [
+            ApiResponse(
+                status_code=200,
+                data={"choices": [{"message": {"content": '{"primary":"The method produced good results.","variants":[]}'}}]},
+                latency_ms=20.0,
+                tokens_consumed=30,
+            ),
+            ApiResponse(
+                status_code=200,
+                data={"choices": [{"message": {"content": '{"primary":"The revised method yielded strong results.","variants":[]}'}}]},
+                latency_ms=20.0,
+                tokens_consumed=35,
+            ),
+        ]
+        result = await reword_text_segment(
+            "The method produced good results.",
+            style=RewordStyle.ACADEMIC_FORMAL,
+            bypass_cache=True,
+        )
+
+        assert result.primary_replacement == "The revised method yielded strong results."
+        assert result.primary_replacement != "The method produced good results."
+        assert mock_dispatch.call_count == 2
