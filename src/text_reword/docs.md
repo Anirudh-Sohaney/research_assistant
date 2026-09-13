@@ -1,11 +1,11 @@
 # Text Reword Documentation
 
 ## Module Overview
-`text_reword` rewrites highlighted sentences and paragraphs exclusively through OpenRouter's Ling model (`inclusionai/ling-3.0-flash-fin:free` by default) to improve academic tone, add detail, or simplify language while shielding citations and math expressions. The interactive Alt+P popup exposes these three modes and previews the generated replacement before injection; its initial request bypasses the semantic cache so the selected text is sent to Ling. There is no hard-coded local rewrite fallback: an unavailable, timed-out, invalid, empty, or unchanged model response receives one bounded LLM retry; if that also fails, the popup reports the error and can be retried with `R`. The reword request timeout is 120 seconds by default and can be overridden with `OPENROUTER_REWORD_TIMEOUT`.
+`text_reword` rewrites highlighted sentences and paragraphs exclusively through the configured language model to improve academic tone, add detail, or simplify language while shielding citations and math expressions. The interactive Alt+P popup exposes these three modes and previews the generated replacement before injection; its initial request bypasses the semantic cache so the selected text is sent to the model. There is no hard-coded local rewrite fallback: an unavailable, timed-out, invalid, empty, or unchanged model response receives one bounded LLM retry; if that also fails, the popup reports the error and can be retried with `R`. The reword request timeout is 120 seconds by default.
 
 ## File Structure
 - `models.py`: Data classes (`RewordStyle`, `SurroundingContext`, `EntityMaskReport`, `RewordResult`).
-- `reword.py`: Entity masking/unmasking, prompt assembly, token budgeting, and OpenRouter response parsing.
+- `reword.py`: Entity masking/unmasking, prompt assembly, token budgeting, and provider response parsing.
 - `tests/test_text_reword.py`: Unit test suite testing citation shielding, math protection, unavailable-service handling, and LLM output parsing.
 
 ## API Reference
@@ -14,7 +14,7 @@
 Rewords the selected text under the requested academic style profile.
 - **`selected_text`**: Raw highlighted text in editor.
 - **`context`**: Optional surrounding sentence context (`preceding_sentence`, `following_sentence`).
-- **`style`**: `RewordStyle` enum (`ACADEMIC_FORMAL`, `CONCISE_FLOW`, `SIMPLIFIED_CLARITY`, `EXPANDED_ARGUMENT`). Sentence and paragraph budgets are 1,800 and 2,200 completion tokens respectively, covering Ling's internal reasoning plus the final JSON rewrite. Ling is sent explicit restructuring/detail/simplification directives, with reasoning excluded from the returned message so the popup receives the final rewrite. Set `OPENROUTER_REWORD_MODEL` to select another OpenRouter model.
+- **`style`**: `RewordStyle` enum (`ACADEMIC_FORMAL`, `CONCISE_FLOW`, `SIMPLIFIED_CLARITY`, `EXPANDED_ARGUMENT`). Sentence and paragraph budgets are 1,800 and 2,200 completion tokens respectively, covering internal reasoning plus the final JSON rewrite. The model receives explicit restructuring/detail/simplification directives, with reasoning excluded from the returned message so the popup receives the final rewrite.
 - **Interactive modes**: `ACADEMIC_FORMAL` fully rewrites and restructures the wording while preserving the idea; `EXPANDED_ARGUMENT` keeps the original progression recognizable while adding useful detail; `SIMPLIFIED_CLARITY` preserves the ideas while using simpler words and constructions. `bypass_cache=True` forces a fresh generation for popup regeneration with `R`.
 - **Returns**: `RewordResult(primary_replacement, alternative_variants, tokens_used, style_applied, cached)`.
 

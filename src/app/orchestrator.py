@@ -150,7 +150,7 @@ class AppOrchestrator:
                 self._reword_result = result.primary_replacement
                 bridge.sig_show_result.emit(
                     self._reword_result
-                    or (result.error or "OpenRouter did not return a usable rewording. Press R to retry.")
+                    or (result.error or "The editor did not return a usable rewording. Press R to retry.")
                 )
             except Exception as exc:
                 log.error("Interactive reword failed: %s", exc)

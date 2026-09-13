@@ -94,7 +94,7 @@ class TestRewordExecution:
 
     @patch("text_reword.reword.query_semantic_cache", return_value=None)
     @patch("text_reword.reword.dispatch_api_request")
-    async def test_ling_model_and_explicit_mode_prompt(self, mock_dispatch, mock_cache):
+    async def test_model_and_explicit_mode_prompt(self, mock_dispatch, mock_cache):
         mock_dispatch.return_value = ApiResponse(
             status_code=200,
             data={"choices": [{"message": {"content": '{"primary":"The experiments demonstrate robust results.","variants":[]}'}}]},

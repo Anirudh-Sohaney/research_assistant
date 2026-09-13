@@ -40,11 +40,6 @@ class RewordOverlay(QtWidgets.QWidget):
         self._header = QtWidgets.QLabel("// SENTENCE // FORGE")
         self._header.setStyleSheet("color:#888; font: bold 9px Consolas; background:transparent;")
         layout.addWidget(self._header)
-        self._target = QtWidgets.QLabel("FULL REWORD")
-        self._target.setWordWrap(True)
-        self._target.setStyleSheet("color:#FFF; font: bold 13px Consolas; background:transparent;")
-        layout.addWidget(self._target)
-
         self._stack = QtWidgets.QStackedWidget()
         self._mode_page = QtWidgets.QWidget()
         mode_layout = QtWidgets.QVBoxLayout(self._mode_page)
@@ -63,7 +58,7 @@ class RewordOverlay(QtWidgets.QWidget):
             mode_layout.addWidget(button)
             self._mode_buttons.append(button)
 
-        self._loading_page = QtWidgets.QLabel("LING // GENERATING\n\n  [ .. ]  APPLYING EDITORIAL DIRECTIVE")
+        self._loading_page = QtWidgets.QLabel("AI EDITOR // GENERATING\n\n  [ .. ]  APPLYING EDITORIAL DIRECTIVE")
         self._loading_page.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._loading_page.setStyleSheet("color:#DDD; font: bold 11px Consolas; background:transparent;")
         self._result_page = QtWidgets.QTextEdit()
@@ -87,7 +82,6 @@ class RewordOverlay(QtWidgets.QWidget):
         self.setGeometry(screen.x() + screen.width() - width - 16, screen.y() + (screen.height() - height) // 2, width, height)
 
     def show_modes(self, selected_text: str):
-        self._target.setText(f'FULL REWORD  |  "{selected_text[:80]}{"..." if len(selected_text) > 80 else ""}"')
         self._stack.setCurrentWidget(self._mode_page)
         self._footer.setText("[1-3] SELECT MODE   [ESC] CANCEL")
         self.position_on_right_edge()
@@ -96,8 +90,8 @@ class RewordOverlay(QtWidgets.QWidget):
     def show_loading(self, mode: str):
         self._result_page.clear()
         self._stack.setCurrentWidget(self._loading_page)
-        self._loading_page.setText(f"LING // GENERATING\n\n  [ .. ]  {mode.upper()} DIRECTIVE")
-        self._footer.setText("GENERATING WITH OPENROUTER LING   [ESC] CANCEL")
+        self._loading_page.setText(f"AI EDITOR // GENERATING\n\n  [ .. ]  {mode.upper()} DIRECTIVE")
+        self._footer.setText("GENERATING REPLACEMENT   [ESC] CANCEL")
         self.position_on_right_edge()
         self.showNormal(); self.show(); self.raise_(); self.activateWindow(); self.setFocus()
 

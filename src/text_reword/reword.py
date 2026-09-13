@@ -83,7 +83,7 @@ class TextRewordEngine:
         """Executes entity shielding, token-budgeted prompt dispatch, and unmasking."""
         ctx = context or SurroundingContext()
         shield = mask_scholarly_entities(selected_text)
-        # Version the key so cached output from the pre-Ling implementation cannot leak into
+        # Version the key so cached output from an older implementation cannot leak into
         # the interactive popup, and include adjacent context in the cache identity.
         cache_key = (
             f"reword_v2:{shield.masked_text}:{style.value}:"
@@ -115,9 +115,9 @@ class TextRewordEngine:
 
         # 2. Prepare compact prompt
         is_paragraph = len(selected_text.split()) > 40
-        # Ling may spend substantial completion tokens on its internal reasoning trace
+        # The selected model may spend substantial completion tokens on internal reasoning
         # before emitting JSON. The limit must cover that trace and the full rewrite;
-        # otherwise OpenRouter can return finish_reason="length" with content=null.
+        # otherwise the provider can return finish_reason="length" with content=null.
         max_tokens = 2200 if is_paragraph else 1800
 
         style_instruction = {
@@ -156,9 +156,9 @@ class TextRewordEngine:
             "Only transform the selected text; use context to resolve meaning."
         )
 
-        # 3. Process OpenRouter responses. A bounded retry is still LLM-only: it
+        # 3. Process provider responses. A bounded retry is still LLM-only: it
         # handles transient empty/length-limited generations without inventing text locally.
-        last_error = "OpenRouter did not return a usable rewording."
+        last_error = "The editor did not return a usable rewording."
         total_tokens = 0
         for attempt in range(2):
             attempt_max_tokens = max_tokens if attempt == 0 else max_tokens + 800
