@@ -164,26 +164,73 @@ def test_global_helpers():
         assert exit_rep.success is True
 
 
-def test_auto_replace_synonym_preserves_trailing_space():
+def test_apply_chosen_synonym_preserves_trailing_space():
     orchestrator = AppOrchestrator()
-    payload = SelectionPayload(
-        selected_text="Learned Inverse-Kinematics Benchmark",
-        app=AppInfo(name="chrome.exe", title="Google Docs", category="browser", pid=1234),
-        hovered_word="Learned",
-        overlap_pixels=256,
-        cursor_position=(500, 500),
-    )
-
     with patch("app.orchestrator.replace_hovered_word_with_text") as mock_replace:
-        res = orchestrator.dispatch_action_pipeline(ActionTrigger.FIND_SYNONYMS, payload)
-        assert res.success is True
-        assert res.ui_handle_id == "auto_replaced"
-        assert mock_replace.called
-        typed_text = mock_replace.call_args[0][0]
-        assert typed_text.endswith(" ")
+        res = orchestrator.apply_chosen_synonym(
+            chosen_word="discovered",
+            target_word="Learned",
+            original_text="Learned Inverse-Kinematics Benchmark",
+            cursor_pos=(500, 500),
+            target_hwnd=1234,
+            is_hovered=True,
+        )
+        assert res == "Discovered "
+        assert res.endswith(" ")
+        mock_replace.assert_called_once_with("Discovered ", cursor_pos=(500, 500), target_hwnd=1234)
 
 
-def test_auto_replace_synonym_no_trailing_space_at_end():
+def test_apply_chosen_synonym_no_trailing_space_at_end():
+    orchestrator = AppOrchestrator()
+    with patch("app.orchestrator.replace_hovered_word_with_text") as mock_replace:
+        res = orchestrator.apply_chosen_synonym(
+            chosen_word="acquired",
+            target_word="learned",
+            original_text="The concept was learned.",
+            cursor_pos=(500, 500),
+            target_hwnd=1234,
+            is_hovered=True,
+        )
+        assert res == "acquired"
+        assert not res.endswith(" ")
+        mock_replace.assert_called_once_with("acquired", cursor_pos=(500, 500), target_hwnd=1234)
+
+
+def test_apply_chosen_synonym_casing():
+    orchestrator = AppOrchestrator()
+    with patch("app.orchestrator.replace_hovered_word_with_text"):
+        # Uppercase
+        res_upper = orchestrator.apply_chosen_synonym(
+            chosen_word="goal",
+            target_word="OBJECTIVE",
+            original_text="PRIMARY OBJECTIVE HERE",
+            cursor_pos=(100, 100),
+            is_hovered=True,
+        )
+        assert res_upper.startswith("GOAL")
+
+        # Capitalized
+        res_cap = orchestrator.apply_chosen_synonym(
+            chosen_word="demonstrate",
+            target_word="Illustrate",
+            original_text="Illustrate the chart",
+            cursor_pos=(100, 100),
+            is_hovered=True,
+        )
+        assert res_cap.startswith("Demonstrate")
+
+        # Lowercase
+        res_lower = orchestrator.apply_chosen_synonym(
+            chosen_word="empirical",
+            target_word="experimental",
+            original_text="experimental proof",
+            cursor_pos=(100, 100),
+            is_hovered=True,
+        )
+        assert res_lower.startswith("empirical")
+
+
+def test_pyqt_overlay_trigger_with_bridge():
     orchestrator = AppOrchestrator()
     payload = SelectionPayload(
         selected_text="The concept was learned.",
@@ -193,125 +240,51 @@ def test_auto_replace_synonym_no_trailing_space_at_end():
         cursor_position=(500, 500),
     )
 
-    with patch("app.orchestrator.replace_hovered_word_with_text") as mock_replace:
+    mock_bridge = MagicMock()
+    with patch("app.orchestrator.get_synonym_overlay_bridge", return_value=mock_bridge):
         res = orchestrator.dispatch_action_pipeline(ActionTrigger.FIND_SYNONYMS, payload)
         assert res.success is True
-        assert res.ui_handle_id == "auto_replaced"
-        assert mock_replace.called
-        typed_text = mock_replace.call_args[0][0]
-        assert not typed_text.endswith(" ")
+        assert res.ui_handle_id == "synonym_overlay"
+        mock_bridge.sig_show_loading.emit.assert_called_once_with("learned")
+        mock_bridge.sig_show_synonyms.emit.assert_called_once()
 
 
-def test_synonym_cycling_on_stationary_cursor():
-    import time
-    orchestrator = AppOrchestrator()
-    payload = SelectionPayload(
-        selected_text="We observed substantial progress.",
-        app=AppInfo(name="chrome.exe", title="Google Docs", category="browser", pid=1234),
-        hovered_word="observed",
-        overlap_pixels=200,
-        cursor_position=(600, 400),
-    )
+def test_pyqt_overlay_ui_navigation_and_cancel():
+    from PyQt6 import QtCore, QtGui, QtWidgets
+    from overlay_ui.pyqt_synonym_overlay import PyQtSynonymOverlay
 
-    with patch("app.orchestrator.replace_hovered_word_with_text") as mock_replace, \
-         patch("app.orchestrator.backspace_and_type") as mock_backspace:
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    overlay = PyQtSynonymOverlay()
+    chosen_results = []
 
-        # 1. Initial Alt+O: auto-replaces hovered word and initializes cycle state
-        res1 = orchestrator.dispatch_action_pipeline(ActionTrigger.FIND_SYNONYMS, payload)
-        assert res1.success is True
-        assert res1.ui_handle_id == "auto_replaced"
-        assert mock_replace.called
-        assert orchestrator._synonym_cycle_state is not None
-        assert len(orchestrator._synonym_cycle_state.candidates) >= 8
-        first_word = orchestrator._synonym_cycle_state.candidates[0]
-        assert orchestrator._synonym_cycle_state.current_index == 0
+    # 1. Loading state
+    overlay.show_loading("test_word")
+    assert overlay.isVisible()
+    assert overlay._stack.currentIndex() == 0
 
-        # 2. Subsequent Alt+O at same cursor (within 5px jitter tolerance)
-        same_cursor_payload = SelectionPayload(
-            selected_text="We observed substantial progress.",
-            app=AppInfo(name="chrome.exe", title="Google Docs", category="browser", pid=1234),
-            hovered_word="observed",
-            overlap_pixels=200,
-            cursor_position=(602, 401),
-        )
-        res2 = orchestrator.dispatch_action_pipeline(ActionTrigger.FIND_SYNONYMS, same_cursor_payload)
-        assert res2.success is True
-        assert res2.ui_handle_id == "synonym_cycled"
-        assert orchestrator._synonym_cycle_state.current_index == 1
-        assert mock_backspace.called
+    # 2. Populated list state
+    overlay.show_synonyms("test_word", ["option1", "option2", "option3"], on_apply=lambda w: chosen_results.append(w))
+    assert overlay.isVisible()
+    assert overlay._stack.currentIndex() == 1
+    assert overlay._list_widget.count() == 3
+    assert overlay._list_widget.currentRow() == 0
 
-        # Verify backspace count matches length of first replacement
-        last_typed_len = len(orchestrator._synonym_cycle_state.candidates[0]) + 1  # trailing space
-        mock_backspace.assert_called_with(
-            last_typed_len,
-            orchestrator._synonym_cycle_state.candidates[1] + " "
-        )
+    # 3. Down arrow navigation
+    event_down = QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, QtCore.Qt.Key.Key_Down, QtCore.Qt.KeyboardModifier.NoModifier)
+    app.sendEvent(overlay._list_widget, event_down)
+    assert overlay._list_widget.currentRow() == 1
 
-        # 3. Third Alt+O: cycles to index 2
-        res3 = orchestrator.dispatch_action_pipeline(ActionTrigger.FIND_SYNONYMS, same_cursor_payload)
-        assert res3.success is True
-        assert res3.ui_handle_id == "synonym_cycled"
-        assert orchestrator._synonym_cycle_state.current_index == 2
+    # 4. Enter applies chosen synonym
+    event_enter = QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, QtCore.Qt.Key.Key_Return, QtCore.Qt.KeyboardModifier.NoModifier)
+    app.sendEvent(overlay._list_widget, event_enter)
+    assert chosen_results == ["option2"]
+    assert not overlay.isVisible()
 
-
-def test_synonym_cycling_aborts_when_cursor_moves():
-    orchestrator = AppOrchestrator()
-    payload = SelectionPayload(
-        selected_text="We observed substantial progress.",
-        app=AppInfo(name="chrome.exe", title="Google Docs", category="browser", pid=1234),
-        hovered_word="observed",
-        overlap_pixels=200,
-        cursor_position=(600, 400),
-    )
-
-    with patch("app.orchestrator.replace_hovered_word_with_text") as mock_replace, \
-         patch("app.orchestrator.backspace_and_type") as mock_backspace:
-
-        # 1. Initial Alt+O
-        res1 = orchestrator.dispatch_action_pipeline(ActionTrigger.FIND_SYNONYMS, payload)
-        assert res1.success is True
-        assert res1.ui_handle_id == "auto_replaced"
-
-        # 2. Cursor moves significantly (e.g. 150 pixels away)
-        moved_payload = SelectionPayload(
-            selected_text="We observed substantial progress.",
-            app=AppInfo(name="chrome.exe", title="Google Docs", category="browser", pid=1234),
-            hovered_word="observed",
-            overlap_pixels=200,
-            cursor_position=(750, 400),
-        )
-        assert orchestrator.can_cycle_synonym(moved_payload.cursor_position) is False
-
-        # Dispatch should NOT cycle; it should re-run initial auto-replace pipeline
-        res2 = orchestrator.dispatch_action_pipeline(ActionTrigger.FIND_SYNONYMS, moved_payload)
-        assert res2.success is True
-        assert res2.ui_handle_id == "auto_replaced"
-        # mock_backspace should not have been called because it did not cycle
-        assert not mock_backspace.called
-
-
-def test_synonym_cycle_wraparound():
-    import time
-    from app.orchestrator import SynonymCycleState
-    orchestrator = AppOrchestrator()
-    candidates = ["examined", "investigated", "evaluated"]
-    orchestrator._synonym_cycle_state = SynonymCycleState(
-        cursor_pos=(100, 100),
-        target_word="observed",
-        candidates=candidates,
-        current_index=2,  # At the end of the candidate list
-        last_typed_text="evaluated ",
-        has_trailing_space=True,
-        casing="lower",
-        timestamp=time.monotonic(),
-    )
-
-    with patch("app.orchestrator.backspace_and_type") as mock_backspace:
-        res = orchestrator.cycle_next_synonym()
-        assert res.success is True
-        # Should wrap back around to index 0
-        assert orchestrator._synonym_cycle_state.current_index == 0
-        assert orchestrator._synonym_cycle_state.last_typed_text == "examined "
-        mock_backspace.assert_called_once_with(len("evaluated "), "examined ")
+    # 5. Esc closes popup
+    overlay.show_synonyms("test_word", ["option1", "option2"])
+    assert overlay.isVisible()
+    event_esc = QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, QtCore.Qt.Key.Key_Escape, QtCore.Qt.KeyboardModifier.NoModifier)
+    app.sendEvent(overlay._list_widget, event_esc)
+    assert not overlay.isVisible()
 
 

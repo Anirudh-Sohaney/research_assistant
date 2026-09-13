@@ -1,42 +1,47 @@
 # Overlay UI Subsystem Documentation
 
 ## Overview
-The `overlay_ui` package provides cursor-anchored, non-intrusive floating card interfaces. It supports progressive disclosure, multi-card navigation, screen boundary collision detection, and instant hotkey-driven selection.
+The `overlay_ui` package provides cursor-anchored, non-intrusive floating card interfaces and the new **PyQt6 Sci-Fi Black & White Synonym Overlay**. It supports right-edge screen alignment, live loading animations, keyboard navigation, screen boundary collision detection, and instant hotkey-driven selection.
 
 ---
 
-## Architecture & Data Models
+## Architecture & Components
 
-### `overlay_ui.models`
+### 1. PyQt6 Sci-Fi Synonym Overlay (`overlay_ui.pyqt_synonym_overlay`)
+- **`PyQtSynonymOverlay`**:
+  - Frameless, translucent, stay-on-top window (`WindowStaysOnTopHint | Tool | FramelessWindowHint`).
+  - Flush to the **right edge of the screen (centered vertically)**.
+  - Palette: Strictly monochrome black & white (`#0A0A0A` card background, `#333333` rounded borders, `#FFFFFF` text and active highlight).
+  - Contains a `QStackedWidget` with 2 pages:
+    - Page 0: `SciFiLoadingWidget` (animated sweep scanline and pulsing dots).
+    - Page 1: `SciFiSynonymListWidget` (numbered candidate list).
+- **`SciFiScanLine`**:
+  - Bi-directional scanning beam widget with smooth gradient animation running on a 25ms timer.
+- **`SciFiLoadingWidget`**:
+  - Minimalist terminal-inspired loading state showing `TARGET » "<word>"`, pulsing dots, scanline, and `"ANALYZING CONTEXT"` status.
+- **`SciFiSynonymListWidget`**:
+  - High-contrast list widget displaying candidates formatted as `[01] candidate`.
+  - Keyboard handlers:
+    - <kbd>Up</kbd> / <kbd>Down</kbd>: Navigates selection.
+    - <kbd>Enter</kbd> / <kbd>Return</kbd>: Emits `item_selected(word)` and triggers apply callback.
+    - <kbd>Esc</kbd>: Immediately hides the window.
+- **`SynonymOverlayBridge`**:
+  - Thread-safe signal dispatcher (`sig_show_loading`, `sig_show_synonyms`, `sig_close`) enabling worker threads to command the Qt GUI thread seamlessly.
+
+### 2. Cursor-Anchored Card Models (`overlay_ui.models`)
 - **`CardType`**: Enum representing active card domains (`DEFINITION`, `SYNONYMS`, `EVIDENCE_STANCE`, `SIMILAR_PAPERS`, `SOURCE_SUMMARY`, `GRAPH_PREVIEW`).
 - **`ScreenRect`**: Geometric structure representing coordinates (`x`, `y`, `width`, `height`).
-- **`PopupItem`**: Represents an individual item within the card:
-  - `id`: Unique identifier (e.g. synonym index or paper DOI).
-  - `title`: Primary display label.
-  - `subtitle`: Secondary metadata / explanation.
-  - `badge`: Display badge (e.g., `"[1]"`).
-  - `metadata`: Auxiliary payload data dictionary.
-- **`PopupCardPayload`**: Full card structure passed to the renderer:
-  - `card_type`: `CardType`.
-  - `title`: Header text.
-  - `items`: List of `PopupItem` objects.
-  - `interactive_actions`: List of active shortcut actions.
-  - `allow_user_prompts`: Flag enabling inline prompt input.
-  - `custom_data`: Dictionary for auxiliary rendering data (e.g., plot data).
-- **`PopupHandle`**: Active handle returned upon display:
-  - `window_id`: String UUID of the window.
-  - `is_visible`: Boolean visibility state.
-  - `bounds`: Computed `ScreenRect`.
-  - `active_payload`: Current `PopupCardPayload`.
-- **`PopupActionEvent`**:
-  - `window_id`: String ID of originating window.
-  - `action`: Emitted action (e.g. `"select_item"`, `"dismiss"`, `"submit"`).
-  - `item_id`: Optional target item identifier.
-  - `text_input`: Optional text data.
+- **`PopupItem`**: Represents an individual item within the card (`id`, `title`, `subtitle`, `badge`, `metadata`).
+- **`PopupCardPayload`**: Full card structure passed to the renderer.
+- **`PopupHandle`**: Active handle returned upon display (`window_id`, `is_visible`, `bounds`, `active_payload`).
+- **`PopupActionEvent`**: Emitted event from user interactions (`select_item`, `dismiss`, `submit`).
 
 ---
 
 ## API Reference
+
+### `get_synonym_overlay_bridge() -> Optional[SynonymOverlayBridge]`
+Returns the global thread-safe bridge to control the PyQt6 Sci-Fi Synonym Overlay.
 
 ### `display_popup_card(payload: PopupCardPayload, anchor_bounds: ScreenRect, screen_size=None, on_action=None) -> PopupHandle`
 Computes clamped coordinates and activates the floating popup card adjacent to the anchor rectangle.
@@ -47,51 +52,24 @@ Updates the card payload of an existing active popup without flickering or repos
 ### `dismiss_popup(window_id: str, immediate: bool = True) -> bool`
 Dismisses and removes the popup window.
 
-### `calculate_clamped_bounds(anchor: ScreenRect, popup_width: int, popup_height: int, screen_width: int, screen_height: int) -> ScreenRect`
-Computes optimal bounding box with collision detection and vertical flipping.
-
 ---
 
 ## Usage Example
 
 ```python
-from overlay_ui import (
-    CardType,
-    OverlayUIManager,
-    PopupCardPayload,
-    PopupItem,
-    ScreenRect,
-    display_popup_card,
-    dismiss_popup,
-)
+from PyQt6 import QtWidgets
+from overlay_ui import get_synonym_overlay_bridge
 
-# Define items with hotkey badges
-items = [
-    PopupItem(id="syn_1", title="robust", badge="[1]"),
-    PopupItem(id="syn_2", title="durable", badge="[2]"),
-]
-payload = PopupCardPayload(
-    card_type=CardType.SYNONYMS,
-    title="Select Synonym",
-    items=items,
-)
+# 1. Obtain bridge
+bridge = get_synonym_overlay_bridge()
 
-# Anchor at selection coordinates
-anchor = ScreenRect(x=400, y=300, width=120, height=24)
-handle = display_popup_card(payload, anchor)
+# 2. Show loading animation immediately when hotkey is pressed
+bridge.sig_show_loading.emit("objective")
 
-print(f"Popup active at ({handle.bounds.x}, {handle.bounds.y}) with ID: {handle.window_id}")
+# 3. Populate with generated candidates and attach apply callback
+def on_apply(chosen_word: str):
+    print(f"User picked: {chosen_word}")
 
-# Dismiss when done
-dismiss_popup(handle.window_id)
+candidates = ["aim", "goal", "purpose", "target", "intention"]
+bridge.sig_show_synonyms.emit("objective", candidates, on_apply)
 ```
-
----
-
-## Verification & Testing
-Tests in `overlay_ui/tests/test_overlay_ui.py` verify:
-- Placement below selection under normal conditions.
-- Upward flipping when overflowing bottom screen margins.
-- Horizontal clamping at right screen boundaries.
-- Live content updating and dismissal lifecycle.
-- Numeric keypress translation into selected item action events.

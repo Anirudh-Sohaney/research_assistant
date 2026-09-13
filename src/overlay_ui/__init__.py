@@ -17,6 +17,12 @@ from overlay_ui.overlay import (
     update_popup_content,
 )
 
+from overlay_ui.pyqt_synonym_overlay import (
+    PyQtSynonymOverlay,
+    SynonymOverlayBridge,
+    get_synonym_overlay_bridge,
+)
+
 __all__ = [
     "CardType",
     "PopupActionEvent",
@@ -30,4 +36,7 @@ __all__ = [
     "update_popup_content",
     "dismiss_popup",
     "get_screen_dimensions",
+    "PyQtSynonymOverlay",
+    "SynonymOverlayBridge",
+    "get_synonym_overlay_bridge",
 ]

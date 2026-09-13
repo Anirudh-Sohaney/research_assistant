@@ -1,4 +1,9 @@
-"""Tests for overlay_ui subsystem."""
+import os
+import sys
+
+_src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 import pytest
 from overlay_ui.models import (
@@ -136,3 +141,39 @@ def test_global_helpers():
     assert handle.is_visible is True
     assert update_popup_content(handle.window_id, payload) is True
     assert dismiss_popup(handle.window_id) is True
+
+
+def test_pyqt_synonym_overlay_full_flow():
+    from PyQt6 import QtCore, QtGui, QtWidgets
+    from overlay_ui.pyqt_synonym_overlay import PyQtSynonymOverlay, SynonymOverlayBridge
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    overlay = PyQtSynonymOverlay()
+    bridge = SynonymOverlayBridge(overlay)
+
+    # 1. Loading signal
+    bridge.sig_show_loading.emit("analyze")
+    assert overlay.isVisible()
+    assert overlay._stack.currentIndex() == 0
+
+    applied_words = []
+    # 2. Show synonyms signal
+    bridge.sig_show_synonyms.emit("analyze", ["examine", "investigate", "evaluate"], lambda w: applied_words.append(w))
+    assert overlay._stack.currentIndex() == 1
+    assert overlay._list_widget.count() == 3
+
+    # 3. Arrow down and apply
+    event_down = QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, QtCore.Qt.Key.Key_Down, QtCore.Qt.KeyboardModifier.NoModifier)
+    app.sendEvent(overlay._list_widget, event_down)
+    assert overlay._list_widget.currentRow() == 1
+
+    event_enter = QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, QtCore.Qt.Key.Key_Return, QtCore.Qt.KeyboardModifier.NoModifier)
+    app.sendEvent(overlay._list_widget, event_enter)
+    assert applied_words == ["investigate"]
+    assert not overlay.isVisible()
+
+    # 4. Close signal
+    overlay.show()
+    assert overlay.isVisible()
+    bridge.sig_close.emit()
+    assert not overlay.isVisible()

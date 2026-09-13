@@ -8,8 +8,11 @@ import time
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+from PyQt6 import QtCore, QtWidgets
+
 from app import init_application, shutdown_application
 from app.models import ShutdownReason
+from overlay_ui import get_synonym_overlay_bridge
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,13 +26,21 @@ def main():
     print("[*] Starting Research Aid Desktop Assistant...")
     print("=" * 65)
 
+    # Initialize Qt GUI Application
+    qt_app = QtWidgets.QApplication.instance()
+    if qt_app is None:
+        qt_app = QtWidgets.QApplication(sys.argv)
+
+    # Pre-warm PyQt Sci-Fi Synonym Overlay & Bridge
+    bridge = get_synonym_overlay_bridge()
+
     context = init_application()
     print(f"Session ID  : {context.session_id}")
     print(f"Daemon PID  : {context.daemon_pid}")
     print(f"Health State: {'ONLINE' if context.is_healthy else 'DEGRADED'}")
     print("-" * 65)
     print("Active Global Shortcuts:")
-    print("  * Synonyms       : Alt + O (Swap hovered word; press again without moving cursor to cycle 8-12 synonyms)")
+    print("  * Synonyms       : Alt + O (Sci-Fi right-edge popup; Up/Down to navigate, Enter to apply, Esc to cancel)")
     print("  * Definitions    : Ctrl + Shift + D")
     print("  * Table to Graph : Ctrl + Shift + G")
     print("  * Reword Text    : Ctrl + Shift + R")
@@ -43,14 +54,20 @@ def main():
     def handle_signal(sig, frame):
         print("\nShutting down gracefully...")
         shutdown_application(ShutdownReason.USER_QUIT)
+        if qt_app:
+            qt_app.quit()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
+    # Periodic timer to allow Python interpreter to service OS signals (Ctrl+C)
+    sig_timer = QtCore.QTimer()
+    sig_timer.timeout.connect(lambda: None)
+    sig_timer.start(200)
+
     try:
-        while True:
-            time.sleep(1.0)
+        qt_app.exec()
     except (KeyboardInterrupt, SystemExit):
         handle_signal(None, None)
 

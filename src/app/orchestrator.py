@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import math
 import os
 import re
+import sys
 import tempfile
 import time
 import uuid
@@ -30,11 +31,13 @@ from lexical_definitions.definitions import lookup_contextual_definition
 from lexical_synonyms.synonyms import find_contextual_synonyms
 from overlay_ui.models import CardType, PopupCardPayload, PopupItem, ScreenRect
 from overlay_ui.overlay import OverlayUIManager
+from overlay_ui.pyqt_synonym_overlay import get_synonym_overlay_bridge
 from paper_discovery.discovery import discover_similar_papers
 from selection_reader.extractor import extract_selection
 from selection_reader.models import AppInfo, SelectionPayload
 import random
 from source_summary.profiler import profile_external_source
+import threading
 from text_injector.injector import (
     backspace_and_type,
     inject_text_replacement,
@@ -45,19 +48,6 @@ from text_reword.reword import reword_text_segment
 log = logging.getLogger("app_orchestrator")
 
 T = TypeVar("T")
-
-
-@dataclass
-class SynonymCycleState:
-    """Tracks active synonym cycle state for in-place replacement without re-triggering LLM."""
-    cursor_pos: Tuple[int, int]
-    target_word: str
-    candidates: List[str]
-    current_index: int
-    last_typed_text: str
-    has_trailing_space: bool
-    casing: str  # "upper", "capitalize", or "lower"
-    timestamp: float
 
 
 def _run_async(coro: Coroutine[Any, Any, T]) -> T:
@@ -83,84 +73,53 @@ class AppOrchestrator:
         self.overlay_manager = OverlayUIManager()
         self.total_tokens_consumed = 0
         self.is_running = False
-        self._synonym_cycle_state: Optional[SynonymCycleState] = None
+        self.last_foreground_hwnd: Optional[int] = None
 
-    def can_cycle_synonym(
+    def apply_chosen_synonym(
         self,
+        chosen_word: str,
+        target_word: str,
+        original_text: str,
         cursor_pos: Optional[Tuple[int, int]] = None,
-        target_word: Optional[str] = None,
-    ) -> bool:
-        """Determines if the next Alt+O trigger should cycle through cached synonyms."""
-        if not self._synonym_cycle_state or not self._synonym_cycle_state.candidates:
-            return False
-        if target_word and target_word.strip().lower() != self._synonym_cycle_state.target_word.lower():
-            return False
-        if cursor_pos is None:
-            try:
-                from selection_reader.ocr_hover import get_cursor_bounds
-                cx, cy, _, _ = get_cursor_bounds()
-                cursor_pos = (cx, cy)
-            except Exception:
-                return False
-        prev_x, prev_y = self._synonym_cycle_state.cursor_pos
-        # Mouse stationary tolerance: within 5 pixels Euclidean distance
-        dist = math.hypot(cursor_pos[0] - prev_x, cursor_pos[1] - prev_y)
-        if dist > 5.0:
-            return False
-        # Active cycle window timeout (60 seconds)
-        if time.monotonic() - self._synonym_cycle_state.timestamp > 60.0:
-            return False
-        return True
-
-    def cycle_next_synonym(self) -> ActionResult:
-        """Backspaces previously typed synonym and types the next candidate in the 8-12 cycle."""
-        start_time = time.monotonic()
-        state = self._synonym_cycle_state
-        if not state or not state.candidates:
-            return ActionResult(
-                success=False,
-                action=ActionTrigger.FIND_SYNONYMS,
-                latency_ms=0.0,
-                tokens_used=0,
-                tier="TIER_1_LOCAL",
-                output_summary="No active synonym cycle state.",
-            )
-
-        next_index = (state.current_index + 1) % len(state.candidates)
-        candidate_word = state.candidates[next_index]
-
-        if state.casing == "upper":
-            replacement_word = candidate_word.upper()
-        elif state.casing == "capitalize":
-            replacement_word = candidate_word.capitalize()
+        target_hwnd: Optional[int] = None,
+        is_hovered: bool = False,
+    ) -> str:
+        """Applies chosen synonym preserving casing, trailing space, and window focus."""
+        if target_word.isupper():
+            replacement_word = chosen_word.upper()
+        elif target_word[0].isupper():
+            replacement_word = chosen_word.capitalize()
         else:
-            replacement_word = candidate_word.lower()
+            replacement_word = chosen_word.lower()
 
-        if state.has_trailing_space:
+        has_trailing_space = bool(
+            re.search(r"\b" + re.escape(target_word) + r"\s", original_text, flags=re.IGNORECASE)
+        )
+        if has_trailing_space:
             replacement_word += " "
 
-        backspace_count = len(state.last_typed_text)
         print(
-            f"[CYCLE SYNONYM] Backspacing {backspace_count} chars & typing candidate [{next_index + 1}/{len(state.candidates)}] '{replacement_word.strip()}'...",
+            f"[APPLY SYNONYM] Applying '{replacement_word.strip()}' replacing '{target_word}' (trailing space: {has_trailing_space})...",
             flush=True,
         )
-        backspace_and_type(backspace_count, replacement_word)
 
-        state.current_index = next_index
-        state.last_typed_text = replacement_word
-        state.timestamp = time.monotonic()
+        if is_hovered and cursor_pos:
+            replace_hovered_word_with_text(
+                replacement_word,
+                cursor_pos=cursor_pos,
+                target_hwnd=target_hwnd,
+            )
+        else:
+            if target_hwnd and sys.platform == "win32":
+                try:
+                    import ctypes
+                    ctypes.windll.user32.SetForegroundWindow(target_hwnd)
+                    time.sleep(0.04)
+                except Exception:
+                    pass
+            inject_text_replacement(replacement_word)
 
-        elapsed = (time.monotonic() - start_time) * 1000.0
-        return ActionResult(
-            success=True,
-            action=ActionTrigger.FIND_SYNONYMS,
-            latency_ms=round(elapsed, 2),
-            tokens_used=0,
-            tier="TIER_1_LOCAL",
-            output_summary=f"Cycled synonym ({next_index + 1}/{len(state.candidates)}): '{replacement_word.strip()}' replacing '{state.target_word}'.",
-            ui_handle_id="synonym_cycled",
-            data={"candidates": state.candidates, "current_index": next_index, "word": replacement_word.strip()},
-        )
+        return replacement_word
 
     def init_application(self, config_path: Optional[str] = None) -> AppRuntimeContext:
         """Bootstraps all background services, registers shortcuts, and mounts the event bus."""
@@ -175,16 +134,14 @@ class AppOrchestrator:
             try:
                 print(f"\n[HOTKEY TRIGGERED] {event.action} ({event.chord})", flush=True)
 
-                # Check if this hotkey is an Alt+O synonym cycle on stationary cursor
-                if event.action in ("synonym", "synonym_ctrl"):
-                    from selection_reader.ocr_hover import get_cursor_bounds
-                    cx, cy, _, _ = get_cursor_bounds()
-                    cur_pos = (cx, cy)
-                    if self.can_cycle_synonym(cur_pos):
-                        print(f"[CYCLE SYNONYM] Cursor stationary at {cur_pos}. Cycling to next cached synonym...", flush=True)
-                        res = self.cycle_next_synonym()
-                        print(f"[STATUS] {res.output_summary}", flush=True)
-                        return
+                target_hwnd = None
+                if sys.platform == "win32":
+                    try:
+                        import ctypes
+                        target_hwnd = ctypes.windll.user32.GetForegroundWindow()
+                    except Exception:
+                        target_hwnd = None
+                self.last_foreground_hwnd = target_hwnd
 
                 action_map = {
                     "synonym": ActionTrigger.FIND_SYNONYMS,
@@ -265,126 +222,92 @@ class AppOrchestrator:
 
         try:
             if action == ActionTrigger.FIND_SYNONYMS:
-                # 0. Check if this is a repeated Alt+O cycle request on stationary cursor
-                if self.can_cycle_synonym(context.cursor_position, target_word=context.hovered_word):
-                    return self.cycle_next_synonym()
-
-                is_text_highlighted = bool(text and text.strip())
-                is_cursor_hovering_highlighted_word = bool(
-                    context.hovered_word
-                    and context.hovered_word.strip()
-                    and context.overlap_pixels >= 1
-                )
-
-                # If BOTH (a) text is highlighted and (b) cursor is hovering a highlighted word:
-                if is_text_highlighted and is_cursor_hovering_highlighted_word:
+                # 1. Determine target word
+                if context.hovered_word and context.hovered_word.strip() and context.overlap_pixels >= 1:
                     target_word = context.hovered_word.strip()
-                    syn_result = _run_async(find_contextual_synonyms(target_word, text, limit=12))
-                    candidates = syn_result.ranked_synonyms[:12]
-                    candidate_words = [item.word for item in candidates]
+                    is_hovered = True
+                else:
+                    target_word = text.strip()
+                    if " " in target_word:
+                        target_word = target_word.split()[0]
+                    is_hovered = False
 
-                    if candidates:
-                        chosen_item = candidates[0]
-                        chosen_word = chosen_item.word
+                # 2. Extract cursor coordinates & target window handle
+                cur_pos = context.cursor_position
+                if cur_pos is None:
+                    try:
+                        from selection_reader.ocr_hover import get_cursor_bounds
+                        cx, cy, _, _ = get_cursor_bounds()
+                        cur_pos = (cx, cy)
+                    except Exception:
+                        cur_pos = None
 
-                        # Preserve original casing
-                        if target_word.isupper():
-                            casing = "upper"
-                            replacement_word = chosen_word.upper()
-                        elif target_word[0].isupper():
-                            casing = "capitalize"
-                            replacement_word = chosen_word.capitalize()
-                        else:
-                            casing = "lower"
-                            replacement_word = chosen_word.lower()
+                target_hwnd = getattr(self, "last_foreground_hwnd", None)
+                if not target_hwnd and sys.platform == "win32":
+                    try:
+                        import ctypes
+                        target_hwnd = ctypes.windll.user32.GetForegroundWindow()
+                    except Exception:
+                        target_hwnd = None
 
-                        # Check if there is a space after the word being edited in the selection text
-                        # Since double-clicking selects the trailing space in rich text editors,
-                        # we must append a space to the replacement word so the space is preserved.
-                        has_trailing_space = bool(
-                            re.search(r"\b" + re.escape(target_word) + r"\s", text, flags=re.IGNORECASE)
-                        )
-                        if has_trailing_space:
-                            replacement_word += " "
+                # 3. Check for PyQt6 Sci-Fi Overlay Bridge
+                bridge = get_synonym_overlay_bridge()
+                if bridge is not None:
+                    # Immediately pop up the right-edge vertically centered card with loading animation
+                    bridge.sig_show_loading.emit(target_word)
 
-                        print(
-                            f"[AUTO-REPLACE] Double-clicking '{target_word}' & typing top-ranked synonym '{replacement_word}' at high speed (trailing space: {has_trailing_space})...",
-                            flush=True,
-                        )
-                        replace_hovered_word_with_text(replacement_word)
+                    def fetch_and_populate():
+                        try:
+                            syn_result = _run_async(find_contextual_synonyms(target_word, text, limit=12))
+                            candidates = [item.word for item in syn_result.ranked_synonyms[:12]]
+                            if not candidates:
+                                candidates = [target_word]
 
-                        cur_pos = context.cursor_position
-                        if cur_pos is None:
-                            try:
-                                from selection_reader.ocr_hover import get_cursor_bounds
-                                cx, cy, _, _ = get_cursor_bounds()
-                                cur_pos = (cx, cy)
-                            except Exception:
-                                cur_pos = (0, 0)
+                            def on_synonym_chosen(chosen_word: str):
+                                self.apply_chosen_synonym(
+                                    chosen_word=chosen_word,
+                                    target_word=target_word,
+                                    original_text=text,
+                                    cursor_pos=cur_pos,
+                                    target_hwnd=target_hwnd,
+                                    is_hovered=is_hovered,
+                                )
 
-                        # Initialize runtime cycle state with generated 8-12 candidates
-                        self._synonym_cycle_state = SynonymCycleState(
-                            cursor_pos=cur_pos,
-                            target_word=target_word,
-                            candidates=candidate_words,
-                            current_index=0,
-                            last_typed_text=replacement_word,
-                            has_trailing_space=has_trailing_space,
-                            casing=casing,
-                            timestamp=time.monotonic(),
-                        )
+                            bridge.sig_show_synonyms.emit(target_word, candidates, on_synonym_chosen)
+                        except Exception as exc:
+                            log.error("Error fetching contextual synonyms: %s", exc)
+                            bridge.sig_close.emit()
 
-                        elapsed = (time.monotonic() - start_time) * 1000.0
-                        return ActionResult(
-                            success=True,
-                            action=action,
-                            latency_ms=round(elapsed, 2),
-                            tokens_used=0,
-                            tier="TIER_1_LOCAL",
-                            output_summary=f"Auto-replaced '{target_word}' with '{replacement_word.strip()}' (chosen from {len(candidates)} top candidates).",
-                            data=syn_result,
-                            ui_handle_id="auto_replaced",
-                        )
+                    if "pytest" in sys.modules and threading.current_thread() is threading.main_thread():
+                        fetch_and_populate()
+                    else:
+                        threading.Thread(target=fetch_and_populate, daemon=True).start()
 
-                # Fallback if cursor is not hovering a highlighted word: display the overlay card
-                self._synonym_cycle_state = None
-                target_word = (context.hovered_word or text).strip()
-                syn_result = _run_async(find_contextual_synonyms(target_word, text, limit=12))
-                items = [
-                    PopupItem(
-                        id=f"syn_{i}",
-                        title=item.word,
-                        subtitle=f"Score: {item.composite_score:.2f} | Register: {item.academic_register:.2f}",
-                        badge=f"[{i+1}]",
+                    elapsed = (time.monotonic() - start_time) * 1000.0
+                    return ActionResult(
+                        success=True,
+                        action=action,
+                        latency_ms=round(elapsed, 2),
+                        tokens_used=0,
+                        tier="TIER_1_LOCAL",
+                        output_summary=f"Opened Sci-Fi synonym overlay for '{target_word}'.",
+                        ui_handle_id="synonym_overlay",
                     )
-                    for i, item in enumerate(syn_result.ranked_synonyms)
-                ]
-                payload = PopupCardPayload(
-                    card_type=CardType.SYNONYMS,
-                    title=f"Synonyms for '{target_word}'",
-                    items=items,
-                    interactive_actions=["[1-8] Select & Replace", "[Esc] Dismiss"],
-                )
-
-                def on_syn_action(ev: PopupActionEvent):
-                    if ev.action == "select_item" and ev.text_input:
-                        print(f"[INJECT] Replacing selection with '{ev.text_input}'...", flush=True)
-                        inject_text_replacement(ev.text_input)
-
-                handle = self.overlay_manager.display_popup_card(
-                    payload, default_anchor, on_action=on_syn_action
-                )
-                elapsed = (time.monotonic() - start_time) * 1000.0
-                return ActionResult(
-                    success=True,
-                    action=action,
-                    latency_ms=round(elapsed, 2),
-                    tokens_used=0,
-                    tier="TIER_1_LOCAL",
-                    output_summary=f"Found {len(syn_result.ranked_synonyms)} contextual synonyms.",
-                    ui_handle_id=handle.window_id,
-                    data=syn_result,
-                )
+                else:
+                    # Headless fallback / unit test mode without GUI
+                    syn_result = _run_async(find_contextual_synonyms(target_word, text, limit=12))
+                    candidates = [item.word for item in syn_result.ranked_synonyms[:12]]
+                    elapsed = (time.monotonic() - start_time) * 1000.0
+                    return ActionResult(
+                        success=True,
+                        action=action,
+                        latency_ms=round(elapsed, 2),
+                        tokens_used=0,
+                        tier="TIER_1_LOCAL",
+                        output_summary=f"Found {len(candidates)} contextual synonyms for '{target_word}'.",
+                        data=syn_result,
+                        ui_handle_id="synonym_overlay",
+                    )
 
             elif action == ActionTrigger.FIND_DEFINITIONS:
                 target_word = (context.hovered_word or text).strip()
@@ -622,7 +545,14 @@ class AppOrchestrator:
         except Exception as exc:
             log.warning("Error stopping daemon: %s", exc)
 
-        self._synonym_cycle_state = None
+        # 4. Close PyQt Sci-Fi overlay if present
+        try:
+            bridge = get_synonym_overlay_bridge()
+            if bridge:
+                bridge.sig_close.emit()
+        except Exception:
+            pass
+
         self.is_running = False
         elapsed = (time.monotonic() - start_time) * 1000.0
 
@@ -649,8 +579,22 @@ def dispatch_action_pipeline(
     return _global_app.dispatch_action_pipeline(action, context, anchor_rect)
 
 
-def cycle_next_synonym() -> ActionResult:
-    return _global_app.cycle_next_synonym()
+def apply_chosen_synonym(
+    chosen_word: str,
+    target_word: str,
+    original_text: str,
+    cursor_pos: Optional[Tuple[int, int]] = None,
+    target_hwnd: Optional[int] = None,
+    is_hovered: bool = False,
+) -> str:
+    return _global_app.apply_chosen_synonym(
+        chosen_word=chosen_word,
+        target_word=target_word,
+        original_text=original_text,
+        cursor_pos=cursor_pos,
+        target_hwnd=target_hwnd,
+        is_hovered=is_hovered,
+    )
 
 
 def shutdown_application(

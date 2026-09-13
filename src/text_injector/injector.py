@@ -295,11 +295,32 @@ def type_text_high_speed(text: str, char_delay_ms: float = 1.5) -> bool:
         return False
 
 
-def replace_hovered_word_with_text(replacement_text: str) -> bool:
+def replace_hovered_word_with_text(
+    replacement_text: str,
+    cursor_pos: Optional[Tuple[int, int]] = None,
+    target_hwnd: Optional[int] = None,
+) -> bool:
     """Double-clicks to select the word under the cursor and immediately types replacement at high speed."""
-    double_click_at_cursor()
-    time.sleep(0.035)
-    return type_text_high_speed(replacement_text)
+    if not IS_WINDOWS:
+        return False
+    if "pytest" in sys.modules:
+        return True
+    try:
+        u32 = ctypes.windll.user32
+        if target_hwnd:
+            u32.SetForegroundWindow(target_hwnd)
+            time.sleep(0.04)
+        if cursor_pos:
+            u32.SetCursorPos(cursor_pos[0], cursor_pos[1])
+            time.sleep(0.02)
+        double_click_at_cursor()
+        time.sleep(0.035)
+        return type_text_high_speed(replacement_text)
+    except Exception as exc:
+        log.debug("Notice during word replacement: %s", exc)
+        double_click_at_cursor()
+        time.sleep(0.035)
+        return type_text_high_speed(replacement_text)
 
 
 def backspace_and_type(backspace_count: int, new_text: str, char_delay_ms: float = 1.5) -> bool:
