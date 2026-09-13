@@ -235,8 +235,9 @@ class ApiGateway:
 
     @staticmethod
     def redact_key(text: str) -> str:
-        """Redact API keys like sk-... or Authorization headers."""
-        return re.sub(r"(sk-[a-zA-Z0-9_\-]{6})[a-zA-Z0-9_\-]+", r"\1[REDACTED]", text)
+        """Redact bearer credentials and key-like values from diagnostic text."""
+        text = re.sub(r"(Bearer\s+)[a-zA-Z0-9._-]+", r"\1[REDACTED]", text, flags=re.IGNORECASE)
+        return re.sub(r"((?:api[_-]?key|token)\s*[:=]\s*)[^\s,;]+", r"\1[REDACTED]", text, flags=re.IGNORECASE)
 
     def configure_credentials(self, service: ExternalService, credentials: AuthConfig) -> bool:
         """Register credentials and update rate limits accordingly."""
@@ -309,16 +310,11 @@ class ApiGateway:
             headers.setdefault("X-Title", "Research Aid")
 
         if service == ExternalService.LLM_SERVICE and (not auth or not auth.api_key):
-            # Attempt auto-loading persisted OpenRouter or OpenAI token from disk
-            try:
-                from api_gateway.oauth import get_valid_openrouter_token, get_valid_openai_token
-                auto_token = get_valid_openrouter_token() or get_valid_openai_token()
-                if auto_token:
-                    self.credentials[ExternalService.LLM_SERVICE] = AuthConfig(api_key=auto_token)
-                    auth = self.credentials[ExternalService.LLM_SERVICE]
-                    headers["Authorization"] = f"Bearer {auto_token}"
-            except Exception as exc:
-                log.debug("Notice auto-loading LLM token: %s", exc)
+            env_token = os.getenv("OPENROUTER_API_KEY", "").strip()
+            if env_token:
+                self.credentials[ExternalService.LLM_SERVICE] = AuthConfig(api_key=env_token)
+                auth = self.credentials[ExternalService.LLM_SERVICE]
+                headers["Authorization"] = f"Bearer {env_token}"
 
         if service == ExternalService.LLM_SERVICE and (not auth or not auth.api_key):
             # Graceful unconfigured LLM notice

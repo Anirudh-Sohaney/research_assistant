@@ -91,9 +91,8 @@ def test_cache_set_and_get():
 
 
 @pytest.mark.asyncio
-@patch("api_gateway.oauth.get_valid_openrouter_token", return_value=None)
-@patch("api_gateway.oauth.get_valid_openai_token", return_value=None)
-async def test_unconfigured_llm_fails_gracefully(mock_openai, mock_openrouter):
+async def test_unconfigured_llm_fails_gracefully(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     gateway = ApiGateway()
     try:
         resp = await gateway.dispatch_api_request(
@@ -165,7 +164,7 @@ async def test_llm_token_accounting(mock_req):
     try:
         gw.configure_credentials(
             ExternalService.LLM_SERVICE,
-            AuthConfig(api_key="sk-testsecretkey1234567890"),
+            AuthConfig(api_key="test-key-value"),
         )
 
         resp = await gw.dispatch_api_request(
@@ -188,6 +187,6 @@ async def test_llm_token_accounting(mock_req):
 
 
 def test_key_redaction():
-    raw = "Error sending to sk-proj123456789ABCDEF with key sk-1234567890abcdef"
+    raw = "Error sending Authorization: Bearer credential-value-1234567890"
     redacted = ApiGateway.redact_key(raw)
-    assert "sk-123456[REDACTED]" in redacted
+    assert "Bearer [REDACTED]" in redacted
