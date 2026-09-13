@@ -152,7 +152,9 @@ class AppOrchestrator:
     def _configure_paper_analysis_overlay(self):
         bridge = get_paper_analysis_bridge()
         if bridge is not None and not self._paper_analysis_bridge_connected:
-            bridge.apply_fix_requested.connect(self._apply_paper_fix)
+            # Connect at the actual widget source. This avoids relying on a
+            # signal-to-signal relay across the bridge for the interactive action.
+            bridge.overlay.apply_fix_requested.connect(self._apply_paper_fix)
             self._paper_analysis_bridge_connected = True
         self._paper_analysis_bridge = bridge
         return bridge
@@ -186,7 +188,9 @@ class AppOrchestrator:
 
     def _apply_paper_fix(self, judge_name: str, finding_index: int, excerpt: str, replacement: str):
         """Hide analysis, find the exact excerpt, replace it, then remove that finding."""
+        log.info("Applying paper finding fix: judge=%s finding=%s", judge_name, finding_index)
         if not excerpt.strip() or self._paper_analysis_bridge is None:
+            log.warning("Paper finding fix skipped: missing excerpt or bridge")
             return
         bridge = self._paper_analysis_bridge
         bridge.sig_close.emit()
