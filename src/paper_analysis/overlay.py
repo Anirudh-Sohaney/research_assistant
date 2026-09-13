@@ -49,6 +49,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         layout.addWidget(self.footer)
         root.addWidget(card)
         self._judges: Dict[str, JudgeResult] = {}
+        self._completed_count = 0
 
     def _position(self):
         screen = QtGui.QGuiApplication.primaryScreen().availableGeometry()
@@ -57,6 +58,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
 
     def show_loading(self):
         self._judges.clear()
+        self._completed_count = 0
         self.scores.clear()
         self.explanations.clear()
         self.detail.clear()
@@ -66,6 +68,10 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self._position(); self.show(); self.raise_(); self.activateWindow(); self.setFocus()
 
     def show_judge_result(self, judge: JudgeResult):
+        self._completed_count += 1
+        if judge.error:
+            self.status.setText(f"JUDGES COMPLETE: {self._completed_count} / 8")
+            return
         self._judges[judge.name] = judge
         rows = [self.scores.item(index).text().split("  ", 1)[-1] for index in range(self.scores.count())]
         score = str(judge.score) if judge.score is not None else "ERR"
@@ -75,7 +81,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
             self.scores.addItem(item)
         else:
             self.scores.item(rows.index(judge.name)).setText(f"{score:>3}  {judge.name}")
-        self.status.setText(f"JUDGES COMPLETE: {len(self._judges)} / 8")
+        self.status.setText(f"JUDGES COMPLETE: {self._completed_count} / 8")
         self._position(); self.show(); self.raise_(); self.activateWindow()
 
     def show_complete(self, result: PaperAnalysisResult):
@@ -105,6 +111,9 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
                 item = QtWidgets.QListWidgetItem(f"EXPLANATION {number}\n{finding.explanation}")
                 item.setData(QtCore.Qt.ItemDataRole.UserRole, number - 1)
                 self.explanations.addItem(item)
+        self.explanations.blockSignals(True)
+        self.explanations.setCurrentRow(-1)
+        self.explanations.blockSignals(False)
         self.content.setCurrentWidget(self.explanations)
         self.footer.setText("CLICK AN EXPLANATION FOR REPLACEMENT   [BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
 
@@ -124,7 +133,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
             f"EXACT TEXT TO REPLACE\n{finding.excerpt}\n\n"
             f"REPLACE WITH\n{finding.rewrite or '[DELETE THE AFFECTED TEXT]'}\n\n"
             f"ISSUE\n{finding.issue}\n\n"
-            f"RECOMMENDED FIX\n{finding.fix}"
+            f"INSTRUCTION\n{finding.fix}"
         )
         self.content.setCurrentWidget(self.detail)
         self.footer.setText("[BACKSPACE] BACK TO EXPLANATIONS   [ESC] CLOSE")
