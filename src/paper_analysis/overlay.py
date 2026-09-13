@@ -36,8 +36,10 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self.scores.currentRowChanged.connect(self._show_explanations)
         self.explanations = QtWidgets.QListWidget()
         self.explanations.setWordWrap(True)
+        self.explanations.installEventFilter(self)
         self.explanations.setStyleSheet("QListWidget{color:#DDD;background:#111;border:1px solid #333;border-radius:7px;font:11px Consolas;} QListWidget::item{padding:10px;}")
         self.explanations.currentRowChanged.connect(self._show_finding)
+        self.explanations.itemDoubleClicked.connect(lambda item: self._show_finding(self.explanations.row(item)))
         self.detail = QtWidgets.QTextEdit()
         self.detail.setReadOnly(True)
         self.detail.installEventFilter(self)
@@ -57,6 +59,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
 
         self.apply_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Return), self)
         self.apply_shortcut.setContext(QtCore.Qt.ShortcutContext.WindowShortcut)
+        self.apply_shortcut.setEnabled(False)
         self.apply_shortcut.activated.connect(self._emit_apply_fix)
 
         self.footer = QtWidgets.QLabel("JUDGES WILL APPEAR AS THEY FINISH   [ESC] CLOSE")
@@ -80,6 +83,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self.explanations.clear()
         self.detail.clear()
         self.apply_button.hide()
+        self.apply_shortcut.setEnabled(False)
         self.content.setCurrentWidget(self.scores)
         self.status.setText("RUNNING 8 INDEPENDENT JUDGES...")
         self.footer.setText("JUDGES APPEAR AS THEY FINISH   [ESC] CLOSE")
@@ -134,6 +138,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self.explanations.clearSelection()
         self.explanations.blockSignals(False)
         self.apply_button.hide()
+        self.apply_shortcut.setEnabled(False)
         # Defer the page switch until the judge-row mouse event has finished;
         # otherwise the release event can land on explanation 1 in the new page.
         QtCore.QTimer.singleShot(75, self._activate_explanation_list)
@@ -168,6 +173,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self._active_judge = judge.name
         self._active_finding = index
         self.apply_button.show()
+        self.apply_shortcut.setEnabled(True)
         self.detail.setFocus()
         self.footer.setText("[BACKSPACE] BACK TO EXPLANATIONS   [ESC] CLOSE")
 
@@ -180,6 +186,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
 
     def _show_list(self):
         self.apply_button.hide()
+        self.apply_shortcut.setEnabled(False)
         self.content.setCurrentWidget(self.scores)
         self.footer.setText("CLICK A JUDGE FOR EXPLANATIONS   [ESC] CLOSE")
 
@@ -189,6 +196,7 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
             return
         judge.findings.pop(finding_index)
         self.apply_button.hide()
+        self.apply_shortcut.setEnabled(False)
         if not judge.findings:
             self._judges.pop(judge_name, None)
             for row in range(self.scores.count() - 1, -1, -1):
@@ -210,10 +218,16 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
     def keyPressEvent(self, event: QtGui.QKeyEvent):
         if event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter) and self.content.currentWidget() is self.detail:
             self._emit_apply_fix(); event.accept(); return
+        if event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter) and self.content.currentWidget() is self.explanations:
+            row = self.explanations.currentRow()
+            if row >= 0:
+                self._show_finding(row)
+                event.accept(); return
         if event.key() == QtCore.Qt.Key.Key_Escape:
             self.hide(); event.accept(); return
         if event.key() == QtCore.Qt.Key.Key_Backspace and self.content.currentWidget() is self.detail:
             self.apply_button.hide()
+            self.apply_shortcut.setEnabled(False)
             self.content.setCurrentWidget(self.explanations)
             self.footer.setText("CLICK AN EXPLANATION FOR REPLACEMENT   [BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
             event.accept(); return
@@ -222,15 +236,24 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         super().keyPressEvent(event)
 
     def eventFilter(self, watched, event):
-        if watched is self.detail and event.type() == QtCore.QEvent.Type.KeyPress:
+        detail = getattr(self, "detail", None)
+        explanations = getattr(self, "explanations", None)
+        if watched is detail and event.type() == QtCore.QEvent.Type.KeyPress:
             if event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter):
                 self._emit_apply_fix(); return True
             if event.key() == QtCore.Qt.Key.Key_Escape:
                 self.hide(); return True
             if event.key() == QtCore.Qt.Key.Key_Backspace:
                 self.apply_button.hide()
+                self.apply_shortcut.setEnabled(False)
                 self.content.setCurrentWidget(self.explanations)
                 return True
+        if watched is explanations and event.type() == QtCore.QEvent.Type.KeyPress:
+            if event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter):
+                row = self.explanations.currentRow()
+                if row >= 0:
+                    self._show_finding(row)
+                    return True
         return super().eventFilter(watched, event)
 
 
