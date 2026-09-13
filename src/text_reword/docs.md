@@ -14,7 +14,7 @@
 Rewords the selected text under the requested academic style profile.
 - **`selected_text`**: Raw highlighted text in editor.
 - **`context`**: Optional surrounding sentence context (`preceding_sentence`, `following_sentence`).
-- **`style`**: `RewordStyle` enum (`ACADEMIC_FORMAL`, `CONCISE_FLOW`, `SIMPLIFIED_CLARITY`, `EXPANDED_ARGUMENT`). Sentence and paragraph budgets are 700 and 900 completion tokens respectively. Ling is sent explicit restructuring/detail/simplification directives, with reasoning excluded from the returned message so the popup receives the final rewrite. Set `OPENROUTER_REWORD_MODEL` to select another OpenRouter model.
+- **`style`**: `RewordStyle` enum (`ACADEMIC_FORMAL`, `CONCISE_FLOW`, `SIMPLIFIED_CLARITY`, `EXPANDED_ARGUMENT`). Sentence and paragraph budgets are 1,800 and 2,200 completion tokens respectively, covering Ling's internal reasoning plus the final JSON rewrite. Ling is sent explicit restructuring/detail/simplification directives, with reasoning excluded from the returned message so the popup receives the final rewrite. Set `OPENROUTER_REWORD_MODEL` to select another OpenRouter model.
 - **Interactive modes**: `ACADEMIC_FORMAL` fully rewrites and restructures the wording while preserving the idea; `EXPANDED_ARGUMENT` keeps the original progression recognizable while adding useful detail; `SIMPLIFIED_CLARITY` preserves the ideas while using simpler words and constructions. `bypass_cache=True` forces a fresh generation for popup regeneration with `R`.
 - **Returns**: `RewordResult(primary_replacement, alternative_variants, tokens_used, style_applied, cached)`.
 

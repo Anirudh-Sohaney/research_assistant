@@ -115,9 +115,10 @@ class TextRewordEngine:
 
         # 2. Prepare compact prompt
         is_paragraph = len(selected_text.split()) > 40
-        # Ling may spend completion tokens on an internal reasoning trace before emitting
-        # JSON. Leave enough room for both reasoning and the full rewritten passage.
-        max_tokens = 900 if is_paragraph else 700
+        # Ling may spend substantial completion tokens on its internal reasoning trace
+        # before emitting JSON. The limit must cover that trace and the full rewrite;
+        # otherwise OpenRouter can return finish_reason="length" with content=null.
+        max_tokens = 2200 if is_paragraph else 1800
 
         style_instruction = {
             RewordStyle.ACADEMIC_FORMAL: (
