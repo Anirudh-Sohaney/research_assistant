@@ -1,5 +1,7 @@
 # Research Aid
 
+Video : https://drive.google.com/file/d/1qmhpDipuHXex4TidjSD7ebJUN36HmsSh/view?usp=sharing
+
 ## Summary
 
 Research Aid is a desktop writing assistant for academic papers. It reads highlighted text, retrieves contextual synonyms and definitions, rewrites prose, analyzes papers with independent LLM judges, finds citations, verifies claims, summarizes sources, and turns selected tables into charts. Results appear in keyboard-driven popups and can be inserted back into the active editor.
