@@ -14,23 +14,22 @@ def apply_beige_theme(overlay: QtWidgets.QWidget) -> None:
     for widget in overlay.findChildren(QtWidgets.QWidget):
         if isinstance(widget, QtWidgets.QFrame):
             widget.setStyleSheet(
-                f"QFrame {{ background-color: {BEIGE}; color: {BLACK}; border: 4px solid {BLACK}; border-radius: 12px; }}"
+                f"QFrame {{ background-color: {BEIGE}; color: {BLACK}; border: 2px solid {BLACK}; border-radius: 12px; }}"
             )
         elif isinstance(widget, QtWidgets.QPushButton):
             widget.setStyleSheet(
-                f"QPushButton {{ background-color: {BEIGE}; color: {BLACK}; border: 3px solid {BLACK}; border-radius: 6px; padding: 5px 10px; font-weight: bold; }}"
-                f"QPushButton:hover, QPushButton:checked {{ background-color: {BEIGE_HOVER}; color: {BLACK}; border: 3px solid {BLACK}; }}"
+                f"QPushButton {{ background-color: {BEIGE}; color: {BLACK}; border: 2px solid {BLACK}; border-radius: 6px; padding: 5px 10px; font-weight: bold; }}"
+                f"QPushButton:hover, QPushButton:checked {{ background-color: {BEIGE_HOVER}; color: {BLACK}; border: 2px solid {BLACK}; }}"
             )
         elif isinstance(widget, (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit)):
             widget.setStyleSheet(
-                f"background-color: {BEIGE}; color: {BLACK}; border: 3px solid {BLACK}; border-radius: 6px; padding: 6px; font-weight: bold;"
+                f"background-color: {BEIGE}; color: {BLACK}; border: 2px solid {BLACK}; border-radius: 6px; padding: 6px; font-weight: bold;"
             )
         elif isinstance(widget, (QtWidgets.QListWidget, QtWidgets.QTreeWidget, QtWidgets.QTableWidget)):
             widget.setStyleSheet(
-                f"background-color: {BEIGE}; color: {BLACK}; border: 3px solid {BLACK}; border-radius: 6px; font-weight: bold;"
+                f"background-color: {BEIGE}; color: {BLACK}; border: 2px solid {BLACK}; border-radius: 6px; font-weight: bold;"
             )
         elif isinstance(widget, QtWidgets.QLabel):
             widget.setStyleSheet(f"background: transparent; color: {BLACK}; border: none; font-weight: bold;")
         elif isinstance(widget, QtWidgets.QScrollArea):
-            widget.setStyleSheet(f"background: {BEIGE}; color: {BLACK}; border: 3px solid {BLACK};")
-
+            widget.setStyleSheet(f"background: {BEIGE}; color: {BLACK}; border: 2px solid {BLACK};")
