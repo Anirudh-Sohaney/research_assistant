@@ -29,14 +29,24 @@ from evidence_engine.sources import (
     extract_papers_sync,
     reconstruct_abstract,
 )
+from evidence_engine.similar_papers import (
+    SimilarPaper,
+    SimilarityResult,
+    find_similar_papers,
+    find_similar_papers_sync,
+)
 
 __all__ = [
     "PaperRef",
     "RetrievalResult",
     "SourceReport",
+    "SimilarPaper",
+    "SimilarityResult",
     "build_queries",
     "dedupe_papers",
     "extract_papers",
     "extract_papers_sync",
+    "find_similar_papers",
+    "find_similar_papers_sync",
     "reconstruct_abstract",
 ]
