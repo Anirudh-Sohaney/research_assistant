@@ -162,6 +162,7 @@ class TextRewordEngine:
                     {"role": "user", "content": user_content},
                 ],
                 "temperature": 0.4,
+                "reasoning": {"effort": "low", "exclude": True},
             },
             max_tokens=max_tokens,
         )
@@ -203,13 +204,14 @@ class TextRewordEngine:
             except Exception as exc:
                 log.warning("LLM response parse error: %s", exc)
 
+        error = resp.error or "OpenRouter did not return a usable rewording."
         return RewordResult(
             primary_replacement="",
             alternative_variants=[],
             tokens_used=0,
             style_applied=style.value,
             cached=False,
-            error="OpenRouter did not return a usable rewording.",
+            error=error,
         )
 
     @staticmethod

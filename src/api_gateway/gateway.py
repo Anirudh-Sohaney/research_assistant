@@ -386,7 +386,7 @@ class ApiGateway:
             if breaker:
                 breaker.record_failure()
             latency_ms = (time.monotonic() - start_time) * 1000
-            safe_err = self.redact_key(str(exc))
+            safe_err = self.redact_key(f"{type(exc).__name__}: {exc!r}")
             return ApiResponse(
                 status_code=500,
                 data=None,

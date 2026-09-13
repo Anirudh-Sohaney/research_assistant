@@ -62,7 +62,7 @@ class TestRewordExecution:
 
         assert isinstance(result, RewordResult)
         assert result.primary_replacement == ""
-        assert result.error == "OpenRouter did not return a usable rewording."
+        assert result.error == "offline"
 
     @patch("text_reword.reword.query_semantic_cache", return_value=None)
     @patch("text_reword.reword.dispatch_api_request")
@@ -108,3 +108,4 @@ class TestRewordExecution:
         payload = mock_dispatch.call_args.args[2]
         assert payload.json_body["model"] == "nvidia/nemotron-3-ultra-550b-a55b:free"
         assert "add useful detail" in payload.json_body["messages"][0]["content"]
+        assert payload.json_body["reasoning"] == {"effort": "low", "exclude": True}
