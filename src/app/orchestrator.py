@@ -122,7 +122,9 @@ class AppOrchestrator:
         self._reword_mode = mode
         self._reword_style = style_map[mode]
         self._reword_result = ""
-        self._generate_reword(bypass_cache=False)
+        # Interactive full rewording must always reach the LLM. A semantic-cache
+        # hit can look like an immediate unchanged selection in the popup.
+        self._generate_reword(bypass_cache=True)
 
     def _generate_reword(self, bypass_cache: bool):
         bridge = self._reword_bridge
