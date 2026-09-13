@@ -11,7 +11,7 @@
 ## API Reference
 
 ### `find_contextual_synonyms(target_word: str, sentence_context: str, limit: int = 12, use_llm: bool = True) -> SynonymGroupResult`
-Executes contextual academic synonym discovery. Primary generation uses OpenAI `gpt-5.6-luna` (configurable via `OPENAI_SYNONYM_MODEL`) executed with low reasoning effort (`reasoning_effort="low"`) and fast generation bounds (`max_completion_tokens=120`) using the extracted OAuth bearer credentials from `api_gateway`. Gracefully falls back to local `Qwen2.5-1.5B-Instruct` in `bfloat16` and Datamuse dictionary harvesting + spaCy tense inflection + SentenceTransformer cosine ranking if offline or quota-limited.
+Executes contextual academic synonym discovery. Primary generation uses OpenRouter model `inclusionai/ling-3.0-flash-vl:free` (configurable via `OPENROUTER_SYNONYM_MODEL` or `LLM_SYNONYM_MODEL`) executed with reasoning budget (`max_tokens=450`) using the persisted API key from `api_gateway`. Gracefully falls back to local `Qwen2.5-1.5B-Instruct` in `bfloat16` and Datamuse dictionary harvesting + spaCy tense inflection + SentenceTransformer cosine ranking if offline or rate-limited.
 - **`target_word`**: The highlighted word.
 - **`sentence_context`**: Surrounding sentence string.
 - **`limit`**: Maximum ranked synonyms to return (default: 12).

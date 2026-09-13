@@ -1051,5 +1051,32 @@ def verify_and_save_real_openai_credentials(
     return oauth_creds, verification
 
 
+def get_default_openrouter_credentials_path() -> Path:
+    """Returns filesystem path for persisted OpenRouter credentials."""
+    env_override = os.getenv("OPENROUTER_CREDENTIALS_PATH")
+    if env_override:
+        return Path(env_override).resolve()
+    return (Path.home() / ".research_aid" / "openrouter_credentials.json").resolve()
+
+
+def get_valid_openrouter_token() -> Optional[str]:
+    """Retrieves OpenRouter API key from environment or persisted credentials file."""
+    env_key = os.getenv("OPENROUTER_API_KEY")
+    if env_key and env_key.strip():
+        return env_key.strip()
+
+    creds_path = get_default_openrouter_credentials_path()
+    if creds_path.is_file():
+        try:
+            data = json.loads(creds_path.read_text(encoding="utf-8"))
+            key = data.get("api_key") or data.get("access_token")
+            if key and str(key).strip():
+                return str(key).strip()
+        except Exception as exc:
+            log.debug("Notice reading openrouter credentials: %s", exc)
+    return None
+
+
 if __name__ == "__main__":
     start_openai_device_flow()
+

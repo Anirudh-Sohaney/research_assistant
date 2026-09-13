@@ -22,12 +22,16 @@ from lexical_synonyms.models import (
 log = logging.getLogger("lexical_synonyms")
 
 # =============================================================================
-# OpenAI Model Configuration for Contextual Synonym Generation
-# Temporarily swapped from local Qwen2.5-1.5B to OpenAI gpt-5.6-luna
+# OpenRouter Model Configuration for Contextual Synonym Generation
+# Configured for OpenRouter model: inclusionai/ling-3.0-flash-vl:free
 # =============================================================================
-DEFAULT_OPENAI_SYNONYM_MODEL = os.getenv("OPENAI_SYNONYM_MODEL", "gpt-5.6-luna")
-DEFAULT_REASONING_EFFORT = "low"  # Minimal reasoning chain-of-thought overhead for maximum generation speed
-DEFAULT_MAX_COMPLETION_TOKENS = 120  # Bounded strictly for rapid response latency
+DEFAULT_LLM_SYNONYM_MODEL = os.getenv(
+    "OPENROUTER_SYNONYM_MODEL",
+    os.getenv("LLM_SYNONYM_MODEL", "inclusionai/ling-3.0-flash-vl:free")
+)
+DEFAULT_OPENAI_SYNONYM_MODEL = DEFAULT_LLM_SYNONYM_MODEL  # Backward compatibility alias
+DEFAULT_REASONING_EFFORT = "low"
+DEFAULT_MAX_COMPLETION_TOKENS = 450  # Bounded for reasoning trace + JSON array generation
 
 # Curated Academic Word List (AWL) subset + STEM research vocabulary for register scoring
 ACADEMIC_REGISTER_TERMS: Set[str] = {
@@ -461,29 +465,28 @@ class LexicalSynonymsEngine:
         ranked.sort(key=lambda item: item.composite_score, reverse=True)
         return ranked
 
-    async def _generate_openai_synonyms(
+    async def _generate_openrouter_synonyms(
         self, target_word: str, sentence_context: str, pos_hint: str = "", limit: int = 12
     ) -> List[str]:
-        """Queries OpenAI gpt-5.6-luna at low reasoning effort and highest speed to generate 8-12 academic synonyms.
+        """Queries OpenRouter using model 'inclusionai/ling-3.0-flash-vl:free' to generate 8-12 academic synonyms.
 
         ========================================================================
-        TEMPORARY SWAP IMPLEMENTATION DETAILS:
+        OPENROUTER INTEGRATION DETAILS:
         ========================================================================
-        1. Model Selection: Uses 'gpt-5.6-luna' (configurable via OPENAI_SYNONYM_MODEL env var)
-           to deliver frontier-grade contextual academic vocabulary suggestions.
-        2. Low Reasoning & High Speed:
-           - reasoning_effort="low": Instructs OpenAI's reasoning architecture to minimize
-             internal reasoning trace overhead for the lowest possible latency.
-           - max_completion_tokens=120: Bounded tightly to produce the 8-12 word JSON array
-             within minimal generation cycles.
-           - 10.0s network timeout: Enforces prompt interactive desktop responsiveness.
-        3. Authentication: Dispatches through `api_gateway.dispatch_api_request` with
-           `ExternalService.LLM_SERVICE`. The gateway automatically extracts the valid OAuth bearer
-           token or API key from disk via `get_valid_openai_token()`.
-        4. Prompt Design: Supplies target word, sentence context, and morphological part-of-speech
-           rules to produce context-perfect, drop-in grammatical replacements.
-        5. Extraction & Sanitization: Parses the JSON response array, strips whitespace, filters out
-           the query word, deduplicates case-insensitively, and returns up to `limit` candidates.
+        1. Model Selection: Uses 'inclusionai/ling-3.0-flash-vl:free' (configurable via
+           OPENROUTER_SYNONYM_MODEL env var) via OpenRouter API (https://openrouter.ai/api/v1).
+        2. Prompt Design & Reasoning Budget:
+           - Prompt supplies the target word, sentence context, and morphological part-of-speech
+             rules to enforce exact grammatical agreement when substituted into the sentence.
+           - max_tokens=450: Sufficient token budget to accommodate model reasoning traces
+             plus the full 8-12 word JSON array.
+           - 15.0s network timeout: Enforces desktop responsiveness.
+        3. Centralized API Gateway Dispatch:
+           - Dispatches through `api_gateway.dispatch_api_request` with `ExternalService.LLM_SERVICE`.
+           - Gateway automatically injects Bearer API key, HTTP-Referer, and X-Title headers.
+        4. Robust Output Parsing:
+           - Checks both `message.content` and `message.reasoning` for JSON array or word strings.
+           - Deduplicates case-insensitively, filters out original target word, and returns up to `limit`.
         ========================================================================
         """
         clean_target = target_word.strip()
@@ -517,17 +520,17 @@ class LexicalSynonymsEngine:
         ]
 
         payload_dict = {
-            "model": DEFAULT_OPENAI_SYNONYM_MODEL,
+            "model": DEFAULT_LLM_SYNONYM_MODEL,
             "messages": messages,
-            "reasoning_effort": DEFAULT_REASONING_EFFORT,
-            "max_completion_tokens": DEFAULT_MAX_COMPLETION_TOKENS,
+            "max_tokens": DEFAULT_MAX_COMPLETION_TOKENS,
+            "temperature": 0.2,
         }
 
         try:
             req_payload = RequestPayload(
                 method="POST",
                 json_body=payload_dict,
-                timeout=10.0,
+                timeout=15.0,
             )
             # Dispatch through centralized API gateway (applies rate limiters, circuit breakers, and OAuth bearer token)
             resp = await dispatch_api_request(
@@ -570,8 +573,11 @@ class LexicalSynonymsEngine:
 
             return results[:limit]
         except Exception as exc:
-            log.warning("OpenAI synonym generation notice: %s", exc)
+            log.warning("OpenRouter synonym generation notice: %s", exc)
             return []
+
+    # Backward compatibility alias
+    _generate_openai_synonyms = _generate_openrouter_synonyms
 
     def _generate_qwen_synonyms(
         self, target_word: str, sentence_context: str, pos_hint: str = "", limit: int = 12
@@ -668,11 +674,11 @@ class LexicalSynonymsEngine:
         elif pos in ("NOUN", "PROPN") or tag.startswith("NN"):
             pos_hint = "plural noun" if tag == "NNS" else "noun"
 
-        # 2. Attempt generation with OpenAI gpt-5.6-luna (at low reasoning effort and highest speed)
+        # 2. Attempt generation with OpenRouter inclusionai/ling-3.0-flash-vl:free
         if use_llm:
             req_limit = max(12, limit)
-            # Primary: OpenAI gpt-5.6-luna
-            llm_words = await self._generate_openai_synonyms(
+            # Primary: OpenRouter inclusionai/ling-3.0-flash-vl:free
+            llm_words = await self._generate_openrouter_synonyms(
                 target_word, sentence_context, pos_hint=pos_hint, limit=req_limit
             )
 

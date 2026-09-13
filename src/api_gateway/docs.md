@@ -35,6 +35,9 @@ Persists extracted OAuth credentials to `~/.research_aid/openai_oauth.json` with
 ### `load_oauth_credentials(file_path: Optional[Path] = None) -> Optional[OAuthCredentials]`
 Loads stored credentials from disk.
 
+### `get_valid_openrouter_token() -> Optional[str]`
+Returns a valid OpenRouter API key from environment (`OPENROUTER_API_KEY`) or persisted credentials file (`~/.research_aid/openrouter_credentials.json`).
+
 ### `get_valid_openai_token(file_path: Optional[Path] = None, auto_refresh: bool = True) -> Optional[str]`
 Returns a valid OpenAI access token. If expired and a refresh token is present, automatically performs a refresh grant and saves the rotated tokens.
 

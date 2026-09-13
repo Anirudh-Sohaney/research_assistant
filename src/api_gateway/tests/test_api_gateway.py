@@ -91,8 +91,9 @@ def test_cache_set_and_get():
 
 
 @pytest.mark.asyncio
+@patch("api_gateway.oauth.get_valid_openrouter_token", return_value=None)
 @patch("api_gateway.oauth.get_valid_openai_token", return_value=None)
-async def test_unconfigured_llm_fails_gracefully(mock_token):
+async def test_unconfigured_llm_fails_gracefully(mock_openai, mock_openrouter):
     gateway = ApiGateway()
     try:
         resp = await gateway.dispatch_api_request(

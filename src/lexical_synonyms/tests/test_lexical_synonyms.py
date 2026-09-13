@@ -305,9 +305,8 @@ class TestFullPipeline:
         call_kwargs = mock_dispatch.call_args[1] if mock_dispatch.call_args[1] else mock_dispatch.call_args[0]
         # Check payload
         payload = call_kwargs.payload if hasattr(call_kwargs, "payload") else mock_dispatch.call_args.kwargs.get("payload") or mock_dispatch.call_args[0][2]
-        assert payload.json_body["model"] == "gpt-5.6-luna"
-        assert payload.json_body["reasoning_effort"] == "low"
-        assert payload.json_body["max_completion_tokens"] == 120
+        assert payload.json_body["model"] == "inclusionai/ling-3.0-flash-vl:free"
+        assert payload.json_body["max_tokens"] == 450
 
         assert len(res.ranked_synonyms) == 12
         words = [s.word for s in res.ranked_synonyms]
@@ -316,13 +315,13 @@ class TestFullPipeline:
         assert "observed" not in words  # Target word must be excluded
 
     @patch("lexical_synonyms.synonyms.dispatch_api_request")
-    async def test_openai_fallback_on_quota_error(self, mock_dispatch):
-        """Validates that when OpenAI returns HTTP 429 (quota exhausted), engine falls back gracefully."""
+    async def test_openrouter_fallback_on_rate_limit_error(self, mock_dispatch):
+        """Validates that when OpenRouter returns HTTP 429 (rate limited), engine falls back gracefully."""
         mock_dispatch.return_value = ApiResponse(
             status_code=429,
-            data={"error": {"code": "credit_balance_exhausted", "message": "No credits remaining"}},
+            data={"error": {"code": 429, "message": "Provider rate limited"}},
             latency_ms=50.0,
-            error="HTTP 429: credit_balance_exhausted",
+            error="HTTP 429: Rate limited",
         )
 
         engine = LexicalSynonymsEngine()

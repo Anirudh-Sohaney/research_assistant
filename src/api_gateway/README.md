@@ -8,7 +8,10 @@ A centralized egress communications and token-efficiency gateway (`api_gateway`)
 - Persistent SQLite disk caching for idempotent GET requests with TTL eviction.
 - Token accounting telemetry (`get_token_usage_report()`) and prompt/completion tracking.
 - Credential management (`configure_credentials()`) with automatic API key masking in logs.
-- **OpenAI Account Authentication & Credential Extraction** (`oauth.py`, `auth_cli.py`):
+- **OpenRouter & OpenAI Provider Integration** (`oauth.py`, `gateway.py`, `auth_cli.py`):
+  - Routes `ExternalService.LLM_SERVICE` to OpenRouter (`https://openrouter.ai/api/v1`) by default with environment override (`LLM_BASE_URL`).
+  - Auto-loads OpenRouter API key from environment (`OPENROUTER_API_KEY`) or local file (`~/.research_aid/openrouter_credentials.json`), falling back to OpenAI credentials.
+  - Automatically injects required `HTTP-Referer` and `X-Title` headers for OpenRouter requests.
   - Real OpenAI API Key extraction, live validation against `api.openai.com/v1/models`, organization & project resolution, and secure persistence (`verify_real_openai_api_key()`, `verify_and_save_real_openai_credentials()`).
   - Interactive CLI management tool (`python -m api_gateway.auth_cli`) for checking status, interactive masked authentication, environment variable ingestion, and clearing credentials.
   - **OpenAI OAuth 2.0 Device Code Flow (RFC 8628)** (`OpenAIOAuthClient`, `oauth.py`):

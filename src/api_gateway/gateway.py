@@ -31,7 +31,7 @@ SERVICE_BASE_URLS: Dict[ExternalService, str] = {
     ExternalService.SEMANTIC_SCHOLAR: "https://api.semanticscholar.org/graph/v1",
     ExternalService.OPENALEX: "https://api.openalex.org",
     ExternalService.ARXIV: "http://export.arxiv.org/api",
-    ExternalService.LLM_SERVICE: "https://api.openai.com/v1",
+    ExternalService.LLM_SERVICE: os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1"),
 }
 
 # Rate limits (requests per second)
@@ -298,17 +298,21 @@ class ApiGateway:
             elif service == ExternalService.SEMANTIC_SCHOLAR:
                 headers["x-api-key"] = auth.api_key
 
+        if "openrouter.ai" in url:
+            headers.setdefault("HTTP-Referer", "https://github.com/Anirudh-Sohaney/research_assistant")
+            headers.setdefault("X-Title", "Research Aid")
+
         if service == ExternalService.LLM_SERVICE and (not auth or not auth.api_key):
-            # Attempt auto-loading persisted OAuth / API token from disk
+            # Attempt auto-loading persisted OpenRouter or OpenAI token from disk
             try:
-                from api_gateway.oauth import get_valid_openai_token
-                auto_token = get_valid_openai_token()
+                from api_gateway.oauth import get_valid_openrouter_token, get_valid_openai_token
+                auto_token = get_valid_openrouter_token() or get_valid_openai_token()
                 if auto_token:
                     self.credentials[ExternalService.LLM_SERVICE] = AuthConfig(api_key=auto_token)
                     auth = self.credentials[ExternalService.LLM_SERVICE]
                     headers["Authorization"] = f"Bearer {auto_token}"
             except Exception as exc:
-                log.debug("Notice auto-loading OpenAI token: %s", exc)
+                log.debug("Notice auto-loading LLM token: %s", exc)
 
         if service == ExternalService.LLM_SERVICE and (not auth or not auth.api_key):
             # Graceful unconfigured LLM notice

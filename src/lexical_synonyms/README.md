@@ -2,22 +2,21 @@
 
 ## 1. Final Deliverable
 A high-precision academic synonym discovery and contextual ranking engine (`lexical_synonyms`) providing:
-- **Temporary Primary Engine: OpenAI `gpt-5.6-luna`**: High-speed cloud LLM integration queried with low reasoning effort (`reasoning_effort="low"`) and tight token bounds (`max_completion_tokens=120`) to produce 8–12 context-perfect, tense-aligned academic synonyms at maximum throughput.
-- **Local Instruction-Tuned Fallback (`Qwen2.5-1.5B-Instruct`)**: Runs locally in `bfloat16` when offline or if cloud credits are exhausted, generating tense-aligned academic synonyms with 0 cloud tokens.
+- **Primary Cloud Engine: OpenRouter `inclusionai/ling-3.0-flash-vl:free`**: High-performance cloud LLM integration queried with bounded generation tokens (`max_tokens=450`) to produce 8–12 context-perfect, tense-aligned academic synonyms formatted as a JSON array.
+- **Local Instruction-Tuned Fallback (`Qwen2.5-1.5B-Instruct`)**: Runs locally in `bfloat16` when offline or if cloud provider rate limits occur, generating tense-aligned academic synonyms with 0 cloud tokens.
 - **Candidate Synonym Harvesting Fallback (`harvest_candidate_synonyms()`)**: Multi-source dictionary harvesting via Datamuse REST API (`rel_syn`, `rel_spc`, `ml` with strict `syn` tag validation) and offline fallback lexicons.
 - **Contextual and Scholarly Register Re-Ranking (`rank_candidates_in_context()`)**: Evaluates morphological alignment, SentenceTransformer cosine similarity, and Academic Word List (AWL) fitness.
 - **Top-1 Selection & Cycling Pipeline**: Automatically provides candidates for immediate word substitution and stationary cursor synonym cycling.
 
 ## 2. Algorithm Used
 **Multi-Tier Contextual Academic Synonym Architecture**:
-1. **Primary Generation: OpenAI `gpt-5.6-luna` (Temporary Swap)**:
-   - Queries OpenAI `gpt-5.6-luna` (customizable via `OPENAI_SYNONYM_MODEL` environment variable).
-   - **Low Reasoning Optimization**: Sets `reasoning_effort="low"` in the Chat Completions payload to minimize internal chain-of-thought overhead, providing ultra-low generation latency.
-   - **Highest Speed Bounding**: Constrains `max_completion_tokens=120` and enforces a rapid 10.0s network timeout.
-   - **Bearer Authentication**: Seamlessly authenticates using the verified OAuth token loaded via `api_gateway.oauth.get_valid_openai_token()`.
-   - Returns 8–12 contextually ranked academic synonyms formatted as a JSON array.
+1. **Primary Generation: OpenRouter `inclusionai/ling-3.0-flash-vl:free`**:
+   - Queries OpenRouter API (`https://openrouter.ai/api/v1/chat/completions`) with model `inclusionai/ling-3.0-flash-vl:free` (customizable via `OPENROUTER_SYNONYM_MODEL` or `LLM_SYNONYM_MODEL`).
+   - **Reasoning Budget**: Allocates `max_tokens=450` to accommodate internal model reasoning traces and complete output of 8–12 synonyms.
+   - **Header Injection**: Seamlessly supplies `Authorization: Bearer <api_key>`, `HTTP-Referer`, and `X-Title` via `api_gateway`.
+   - **Robust Parsing**: Examines both message content and reasoning fields to parse the JSON array of words.
 2. **Secondary Generation (Local Qwen2.5-1.5B Fallback)**:
-   - If OpenAI returns an error (such as quota exhaustion HTTP 429 or network disconnect), the engine automatically and silently falls back to local `Qwen/Qwen2.5-1.5B-Instruct` in `bfloat16`.
+   - If OpenRouter returns an error (such as rate limits HTTP 429 or network disconnect), the engine automatically and silently falls back to local `Qwen/Qwen2.5-1.5B-Instruct` in `bfloat16`.
    - Formats a constrained instruction prompt with the exact target word, part-of-speech rules, and surrounding sentence context.
 3. **Stage 1 Dictionary Fallback (Harvesting & Antonym Purging)**:
    - Queries Datamuse REST API (`/words?rel_syn={base_lemma}&md=p,f` and `/words?ml={base_lemma}&md=p,f`) via `src/api_gateway/`.
