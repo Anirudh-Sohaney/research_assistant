@@ -4,6 +4,10 @@
 
 The displayed score uses a calibrated 50–100 quality scale: 50 represents multiple issues, 90 represents publishable quality, and 100 represents perfection. Alt+J opens one compact results section: judges appear as they finish, clicking a judge shows only its explanations, and clicking an explanation shows the exact text to replace and the direct replacement. Every finding contains the exact affected sentence or paragraph, a 100–200 word explanation, a repair instruction, and a direct rewrite; the rewrite is empty when deletion is the correct fix. `Backspace` navigates one level back. Empty, malformed, or under-specified judge responses receive up to three retries.
 
+## Applying a finding
+
+In the expanded finding view, press `Enter` or click `APPLY FIX`. The overlay temporarily hides, the active editor is focused, and the app uses `Ctrl+F` to locate the exact excerpt, `Enter` to select it, and `Escape` to close search before injecting the rewrite. A successful fix removes that finding from the retained analysis. An empty rewrite deletes the selected excerpt. If the editor workflow fails, the original detail view is restored.
+
 ## Files
 
 - `analysis.py`: Judge rubrics, parallel provider calls, JSON parsing, score calibration, and result models.

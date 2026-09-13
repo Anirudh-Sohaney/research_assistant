@@ -17,6 +17,10 @@ Alt+J extracts the highlighted text, opens the analysis overlay, and launches ei
 
 Each judge must return strict JSON with a raw score and ideally three findings, with at least one supported finding required. Each finding contains the exact sentence or paragraph with the issue, a 100–200 word explanation of the issue and correction, a concrete repair instruction, and a direct rewrite. The rewrite is an empty string when deletion is the correct fix. Empty, malformed, or under-specified responses receive up to three larger-budget retries. Invalid or failed judges are omitted from the visible judge list rather than receiving fabricated findings.
 
+## Applying a finding
+
+From an expanded finding, `Enter` or `APPLY FIX` temporarily hides the overlay and runs the editor workflow: focus the original target, press `Ctrl+F`, paste the exact excerpt, press `Enter`, press `Escape`, and inject the rewrite. The analysis reopens with the fixed finding removed. If the rewrite is empty, the selected excerpt is deleted. If automation fails, the original detail view is restored without removing the finding.
+
 ## API
 
 `analyze_paper(selected_text: str) -> PaperAnalysisResult` runs the eight calls concurrently. The configured LLM endpoint is used through `src/api_gateway`; `PAPER_ANALYSIS_MODEL` and `PAPER_ANALYSIS_TIMEOUT` may override the defaults.

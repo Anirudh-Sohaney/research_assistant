@@ -6,7 +6,7 @@ A master application orchestrator (`app.orchestrator.AppOrchestrator`) that unif
 - Two-Tier processing nerve center (`dispatch_action_pipeline`) separating Tier 1 (zero-token local/lexical) from Tier 2 (budgeted RAG + LLM).
 - Universal actuation routing outputs to right-edge Sci-Fi overlay cards (`overlay_ui`), cursor-anchored popups, or direct editor replacement (`text_injector`).
 - Interactive full reword flow on <kbd>Alt</kbd> + <kbd>P</kbd>: choose **Reword**, **Add Detail**, or **Simplify**, preview the OpenRouter/Ling result, press <kbd>Enter</kbd> to replace the highlighted text, or <kbd>R</kbd> to regenerate.
-- Multi-judge paper analysis on <kbd>Alt</kbd> + <kbd>J</kbd>: run eight independent academic reviewers over the full selection and inspect each curved score and finding in a clickable overlay.
+- Multi-judge paper analysis on <kbd>Alt</kbd> + <kbd>J</kbd>: run eight independent academic reviewers over the full selection and inspect each score and finding in a clickable overlay.
 - Background daemon supervisor integration (`daemon_service`) and global hotkey wiring (`hotkey_manager`).
 - Typed runtime context and execution telemetry models (`AppRuntimeContext`, `ActionResult`, `ActionTrigger`, `AppExitReport`, `ShutdownReason`).
 
