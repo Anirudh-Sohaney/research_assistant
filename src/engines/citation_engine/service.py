@@ -11,6 +11,7 @@ from engines.citation_engine.extractors.crossref import CrossrefExtractor
 from engines.citation_engine.extractors.headless import HeadlessBrowserExtractor
 from engines.citation_engine.extractors.meta_jsonld import MetaJsonLdExtractor
 from engines.citation_engine.extractors.openlibrary import OpenLibraryExtractor
+from engines.citation_engine.extractors.title_resolver import TitleResolverExtractor
 from engines.citation_engine.models import (
     CitationResult,
     CitationStyle,
@@ -42,6 +43,7 @@ class CitationService:
         self.openlibrary = OpenLibraryExtractor(timeout_secs=timeout_secs)
         self.meta_jsonld = MetaJsonLdExtractor(timeout_secs=timeout_secs)
         self.headless = HeadlessBrowserExtractor(timeout_secs=timeout_secs)
+        self.title_resolver = TitleResolverExtractor(timeout_secs=timeout_secs)
 
         # Style renderers registry: variations on the same schema
         self._renderers: Dict[CitationStyle, BaseStyleRenderer] = {
@@ -111,6 +113,14 @@ class CitationService:
                         meta = crossref_meta
 
                 self.cache.set(clean_target_url, meta)
+                return meta
+
+        # 6. Bare-title resolution — search-and-verify fallback for plain text queries
+        if self.title_resolver.can_handle(target_str):
+            meta = await self.title_resolver.extract(target_str)
+            if meta:
+                cache_key = f"title:{target_str.lower().strip()}"
+                self.cache.set(cache_key, meta)
                 return meta
 
         return None
