@@ -15,6 +15,7 @@ class ActionTrigger(str, Enum):
     RETRIEVE_EVIDENCE = "RETRIEVE_EVIDENCE"
     GENERATE_GRAPH = "GENERATE_GRAPH"
     SUMMARIZE_SOURCE = "SUMMARIZE_SOURCE"
+    ANALYZE_PAPER = "ANALYZE_PAPER"
 
 
 class ShutdownReason(str, Enum):

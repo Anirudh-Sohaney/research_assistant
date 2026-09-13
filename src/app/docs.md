@@ -60,6 +60,9 @@ Safely stops keyboard listeners, closes the PyQt overlay and floating cards, and
 ### Interactive full reword (`Alt` + `P`)
 The hotkey opens a PyQt mode picker for **Reword**, **Add Detail**, and **Simplify**. The selected text is sent to OpenRouter/Ling with the corresponding editorial instruction. The generated replacement is previewed in the popup; <kbd>Enter</kbd> injects it into the original editor selection, <kbd>R</kbd> requests a fresh generation, and <kbd>Esc</kbd> cancels.
 
+### Multi-judge paper analysis (`Alt` + `J`)
+The hotkey sends the complete selection to eight independent academic-review judges covering consistency, grammar, clarity, organization, evidence, style, methodology, and contribution. The overlay lists curved 50–100 scores and displays 3–6 excerpt-specific repair instructions when a judge is selected.
+
 ---
 
 ## Verification & Testing

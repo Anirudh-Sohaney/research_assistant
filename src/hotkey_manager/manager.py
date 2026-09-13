@@ -30,6 +30,7 @@ DEFAULT_KEY_BINDINGS: Dict[str, str] = {
     "similar_papers": "<ctrl>+<shift>+p",
     "evidence": "<ctrl>+<shift>+e",
     "source_summary": "<ctrl>+<shift>+u",
+    "paper_analysis": "<alt>+j",
     "selection_capture": "<alt>+<shift>+o",
 }
 

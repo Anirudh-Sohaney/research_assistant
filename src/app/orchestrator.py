@@ -33,6 +33,8 @@ from overlay_ui.models import CardType, PopupCardPayload, PopupItem, ScreenRect
 from overlay_ui.overlay import OverlayUIManager
 from overlay_ui.pyqt_synonym_overlay import get_synonym_overlay_bridge
 from overlay_ui.reword_overlay import get_reword_overlay_bridge
+from paper_analysis.analysis import analyze_paper
+from paper_analysis.overlay import get_paper_analysis_bridge
 from paper_discovery.discovery import discover_similar_papers
 from selection_reader.extractor import extract_selection
 from selection_reader.models import AppInfo, SelectionPayload
@@ -83,6 +85,35 @@ class AppOrchestrator:
         self._reword_style = None
         self._reword_result = ""
         self._reword_generation = 0
+        self._paper_analysis_bridge = None
+        self._paper_analysis_generation = 0
+
+    def _configure_paper_analysis_overlay(self):
+        bridge = get_paper_analysis_bridge()
+        self._paper_analysis_bridge = bridge
+        return bridge
+
+    def _open_paper_analysis(self, selected_text: str):
+        bridge = self._configure_paper_analysis_overlay()
+        if bridge is None:
+            return False
+        self._paper_analysis_generation += 1
+        generation = self._paper_analysis_generation
+        bridge.sig_show_loading.emit()
+
+        def worker():
+            try:
+                result = _run_async(analyze_paper(selected_text))
+                if generation == self._paper_analysis_generation:
+                    self.total_tokens_consumed += result.tokens_used
+                    bridge.sig_show_result.emit(result)
+            except Exception as exc:
+                log.error("Paper analysis failed: %s", exc)
+                if generation == self._paper_analysis_generation:
+                    bridge.sig_close.emit()
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
 
     def _configure_reword_overlay(self):
         """Connects the interactive reword popup once on the Qt application thread."""
@@ -255,6 +286,7 @@ class AppOrchestrator:
                     "similar_papers": ActionTrigger.DISCOVER_PAPERS,
                     "evidence": ActionTrigger.RETRIEVE_EVIDENCE,
                     "source_summary": ActionTrigger.SUMMARIZE_SOURCE,
+                    "paper_analysis": ActionTrigger.ANALYZE_PAPER,
                 }
                 if event.action == "reword_popup":
                     payload = extract_selection()
@@ -264,6 +296,15 @@ class AppOrchestrator:
                     print(f"[SELECTION] Text: '{payload.selected_text}'", flush=True)
                     opened = self._open_reword_popup(payload.selected_text, target_hwnd)
                     print("[STATUS] Opened interactive reword popup." if opened else "[STATUS] Reword popup unavailable.", flush=True)
+                    return
+                if event.action == "paper_analysis":
+                    payload = extract_selection()
+                    if payload is None or not payload.selected_text or not payload.selected_text.strip():
+                        print("[SELECTION] No text currently highlighted in active window.", flush=True)
+                        return
+                    print(f"[SELECTION] Text: '{payload.selected_text}'", flush=True)
+                    opened = self._open_paper_analysis(payload.selected_text)
+                    print("[STATUS] Started 8-judge paper analysis." if opened else "[STATUS] Paper analysis unavailable.", flush=True)
                     return
                 trigger = action_map.get(event.action)
                 if trigger:
@@ -296,6 +337,7 @@ class AppOrchestrator:
             "text_reword": True,
             "paper_discovery": True,
             "source_summary": True,
+            "paper_analysis": True,
         }
 
         self.context = AppRuntimeContext(
@@ -692,6 +734,13 @@ class AppOrchestrator:
 
         try:
             bridge = get_reword_overlay_bridge()
+            if bridge:
+                bridge.sig_close.emit()
+        except Exception:
+            pass
+
+        try:
+            bridge = get_paper_analysis_bridge()
             if bridge:
                 bridge.sig_close.emit()
         except Exception:

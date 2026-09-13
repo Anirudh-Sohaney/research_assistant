@@ -15,6 +15,7 @@ from app.models import ShutdownReason
 from overlay_ui import get_synonym_overlay_bridge
 from overlay_ui.reword_overlay import get_reword_overlay_bridge
 from data_to_graph.overlay import get_table_graph_overlay_bridge
+from paper_analysis.overlay import get_paper_analysis_bridge
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +39,7 @@ def main():
     bridge = get_synonym_overlay_bridge()
     get_reword_overlay_bridge()
     get_table_graph_overlay_bridge()
+    get_paper_analysis_bridge()
 
     context = init_application()
     print(f"Session ID  : {context.session_id}")
@@ -53,6 +55,7 @@ def main():
     print("  * Discover Papers: Ctrl + Shift + P")
     print("  * Verify Evidence: Ctrl + Shift + E")
     print("  * Source Summary : Ctrl + Shift + U")
+    print("  * Paper Analysis : Alt + J (8 independent judges; click a score for findings)")
     print("=" * 65)
     print("Background listener active. Ready for word processor actions...")
     sys.stdout.flush()
