@@ -106,6 +106,6 @@ class TestRewordExecution:
             style=RewordStyle.EXPANDED_ARGUMENT,
         )
         payload = mock_dispatch.call_args.args[2]
-        assert payload.json_body["model"] == "nvidia/nemotron-3-ultra-550b-a55b:free"
+        assert payload.json_body["model"] == "inclusionai/ling-3.0-flash-fin:free"
         assert "add useful detail" in payload.json_body["messages"][0]["content"]
         assert payload.json_body["reasoning"] == {"effort": "low", "exclude": True}

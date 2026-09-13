@@ -22,7 +22,7 @@ log = logging.getLogger("text_reword")
 
 DEFAULT_REWORD_MODEL = os.getenv(
     "OPENROUTER_REWORD_MODEL",
-    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "inclusionai/ling-3.0-flash-fin:free",
 )
 DEFAULT_REWORD_TIMEOUT = float(os.getenv("OPENROUTER_REWORD_TIMEOUT", "120"))
 
@@ -121,10 +121,11 @@ class TextRewordEngine:
 
         style_instruction = {
             RewordStyle.ACADEMIC_FORMAL: (
-                "Fully rewrite and restructure the selected text while preserving the exact idea and factual content. "
-                "The user expressed an idea but wants a substantially better formulation: repair grammar and English conventions, "
-                "improve vocabulary, vary syntax, and use a natural new sentence structure. Combine some conservative edits with "
-                "stronger structural and lexical improvements; do not merely delete filler words or lightly proofread. "
+                "Rewrite the entire selection in a genuinely new way while preserving the exact idea and factual content. "
+                "Do not perform a synonym swap, copy the original clause order, or merely remove filler words. "
+                "Change the sentence architecture: restructure clauses, vary the subject/verb relationship or voice where natural, "
+                "reorder information when clear, and replace weak vocabulary. Make at least two meaningful structural or lexical changes "
+                "while maintaining the same meaning, grammar, and English conventions. "
                 "Do not add a preface, self-introduction, conclusion, or any information not present in the source."
             ),
             RewordStyle.EXPANDED_ARGUMENT: (
