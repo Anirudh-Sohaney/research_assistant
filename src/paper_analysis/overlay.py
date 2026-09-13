@@ -115,7 +115,16 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self.explanations.setCurrentRow(-1)
         self.explanations.clearSelection()
         self.explanations.blockSignals(False)
+        # Defer the page switch until the judge-row mouse event has finished;
+        # otherwise the release event can land on explanation 1 in the new page.
+        QtCore.QTimer.singleShot(75, self._activate_explanation_list)
+
+    def _activate_explanation_list(self):
+        self.explanations.blockSignals(True)
         self.content.setCurrentWidget(self.explanations)
+        self.explanations.setCurrentRow(-1)
+        self.explanations.clearSelection()
+        self.explanations.blockSignals(False)
         self.footer.setText("CLICK AN EXPLANATION FOR REPLACEMENT   [BACKSPACE] BACK TO JUDGES   [ESC] CLOSE")
 
     def _show_finding(self, index: int):
