@@ -47,10 +47,17 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self.content.addWidget(self.detail)
         layout.addWidget(self.content, 1)
         self.apply_button = QtWidgets.QPushButton("APPLY FIX  [ENTER]")
+        self.apply_button.setDefault(True)
+        self.apply_button.setAutoDefault(True)
+        self.apply_button.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.apply_button.setStyleSheet("QPushButton{color:#DDD;background:#171717;border:1px solid #555;border-radius:6px;padding:8px;font:bold 10px Consolas;} QPushButton:hover{background:#FFF;color:#000;}")
         self.apply_button.clicked.connect(self._emit_apply_fix)
         self.apply_button.hide()
         layout.addWidget(self.apply_button)
+
+        self.apply_shortcut = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Return), self)
+        self.apply_shortcut.setContext(QtCore.Qt.ShortcutContext.WindowShortcut)
+        self.apply_shortcut.activated.connect(self._emit_apply_fix)
 
         self.footer = QtWidgets.QLabel("JUDGES WILL APPEAR AS THEY FINISH   [ESC] CLOSE")
         self.footer.setStyleSheet("color:#666;font:8px Consolas;background:transparent;")
@@ -201,6 +208,8 @@ class PaperAnalysisOverlay(QtWidgets.QWidget):
         self._position(); self.show(); self.raise_(); self.activateWindow(); self.detail.setFocus()
 
     def keyPressEvent(self, event: QtGui.QKeyEvent):
+        if event.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter) and self.content.currentWidget() is self.detail:
+            self._emit_apply_fix(); event.accept(); return
         if event.key() == QtCore.Qt.Key.Key_Escape:
             self.hide(); event.accept(); return
         if event.key() == QtCore.Qt.Key.Key_Backspace and self.content.currentWidget() is self.detail:
