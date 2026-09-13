@@ -2,7 +2,7 @@
 
 ## Workflow
 
-Alt+J extracts the highlighted text, opens the analysis overlay, and launches eight concurrent language-model calls. Every call receives the full selected text plus one isolated rubric. The calls are independent so one judge cannot anchor another judge's assessment.
+Alt+J extracts the highlighted text, opens the analysis overlay, and launches eight concurrent language-model calls. Every call receives the full selected text plus one isolated rubric. The calls are independent so one judge cannot anchor another judge's assessment. Results stream into the overlay as calls finish rather than waiting for all judges.
 
 ## Judge dimensions
 
@@ -15,7 +15,7 @@ Alt+J extracts the highlighted text, opens the analysis overlay, and launches ei
 7. Methodology — reproducibility, variables, samples, controls, and evaluation design.
 8. Contribution — novelty, significance, limitations, and conclusion alignment.
 
-Each judge must return strict JSON with a raw score and 3–6 findings. Findings contain an exact excerpt, the issue, and a concrete fix. Empty, malformed, or under-specified responses receive one larger-budget retry. Invalid or failed judges remain visible as errors rather than receiving fabricated findings.
+Each judge must return strict JSON with a raw score and 3–6 findings. Findings contain an exact excerpt, the issue, and a concrete fix. Empty, malformed, or under-specified responses receive up to three larger-budget retries. Invalid or failed judges remain visible as errors rather than receiving fabricated findings.
 
 ## API
 
@@ -23,4 +23,4 @@ Each judge must return strict JSON with a raw score and 3–6 findings. Findings
 
 ## UI navigation
 
-The overlay lists all judges and their scores. Selecting a row displays the judge's score, excerpts, issues, and repair instructions. `Esc` closes the overlay.
+The overlay uses one content section. It lists judges as they complete; selecting a row replaces the list with the judge's score, excerpts, issues, and repair instructions. `Backspace` returns to the list and `Esc` closes the overlay.

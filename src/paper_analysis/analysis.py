@@ -9,7 +9,7 @@ import math
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from api_gateway.gateway import dispatch_api_request
 from api_gateway.models import ExternalService, RequestPayload
@@ -101,7 +101,7 @@ def _judge_prompt(name: str, rubric: str, selected_text: str) -> List[Dict[str, 
 async def _run_judge(name: str, rubric: str, selected_text: str) -> JudgeResult:
     last_error = "judge request failed"
     total_tokens = 0
-    for attempt in range(2):
+    for attempt, max_tokens in enumerate((4000, 5200, 6200, 7000)):
         payload = RequestPayload(
             method="POST",
             json_body={
@@ -111,7 +111,7 @@ async def _run_judge(name: str, rubric: str, selected_text: str) -> JudgeResult:
                 "reasoning": {"effort": "low", "exclude": True},
             },
             timeout=DEFAULT_TIMEOUT,
-            max_tokens=4000 if attempt == 0 else 5200,
+            max_tokens=max_tokens,
         )
         try:
             response = await dispatch_api_request(ExternalService.LLM_SERVICE, "/chat/completions", payload)
@@ -143,11 +143,18 @@ async def _run_judge(name: str, rubric: str, selected_text: str) -> JudgeResult:
     return JudgeResult(name, None, error=last_error, tokens_used=total_tokens)
 
 
-async def analyze_paper(selected_text: str) -> PaperAnalysisResult:
+async def analyze_paper(selected_text: str, on_judge: Optional[Callable[[JudgeResult], None]] = None) -> PaperAnalysisResult:
     """Run all independent judges concurrently, each receiving the full selection."""
     if not selected_text.strip():
         raise ValueError("selected paper text cannot be empty")
-    results = await asyncio.gather(*(_run_judge(name, rubric, selected_text) for name, rubric in JUDGE_RUBRICS.items()))
+    tasks = [asyncio.create_task(_run_judge(name, rubric, selected_text)) for name, rubric in JUDGE_RUBRICS.items()]
+    results = []
+    for completed in asyncio.as_completed(tasks):
+        result = await completed
+        results.append(result)
+        if on_judge is not None:
+            on_judge(result)
+    results.sort(key=lambda item: list(JUDGE_RUBRICS).index(item.name))
     valid_scores = [judge.score for judge in results if judge.score is not None]
     return PaperAnalysisResult(
         judges=results,

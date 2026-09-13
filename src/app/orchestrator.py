@@ -103,10 +103,14 @@ class AppOrchestrator:
 
         def worker():
             try:
-                result = _run_async(analyze_paper(selected_text))
+                def publish_judge(judge):
+                    if generation == self._paper_analysis_generation:
+                        bridge.sig_judge_result.emit(judge)
+
+                result = _run_async(analyze_paper(selected_text, on_judge=publish_judge))
                 if generation == self._paper_analysis_generation:
                     self.total_tokens_consumed += result.tokens_used
-                    bridge.sig_show_result.emit(result)
+                    bridge.sig_show_complete.emit(result)
             except Exception as exc:
                 log.error("Paper analysis failed: %s", exc)
                 if generation == self._paper_analysis_generation:

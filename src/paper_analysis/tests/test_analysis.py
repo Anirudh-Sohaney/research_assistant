@@ -9,7 +9,7 @@ _src = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 if _src not in sys.path: sys.path.insert(0, _src)
 
 from api_gateway.models import ApiResponse
-from paper_analysis.analysis import JUDGE_RUBRICS, analyze_paper
+from paper_analysis.analysis import JUDGE_RUBRICS, _run_judge, analyze_paper
 
 
 def _response(name: str, score: int = 84):
@@ -48,3 +48,26 @@ async def test_failed_judge_is_visible_without_fabricating_findings():
     assert sum(j.score is not None for j in result.judges) == 7
     assert result.judges[-1].score is None
     assert result.judges[-1].findings == []
+
+
+@pytest.mark.asyncio
+async def test_judges_are_published_as_they_complete():
+    completed = []
+
+    async def dispatch(*args):
+        return _response("stream")
+
+    with patch("paper_analysis.analysis.dispatch_api_request", side_effect=dispatch):
+        await analyze_paper("A paper paragraph.", on_judge=lambda judge: completed.append(judge.name))
+    assert len(completed) == 8
+    assert set(completed) == set(JUDGE_RUBRICS)
+
+
+@pytest.mark.asyncio
+async def test_judge_uses_up_to_three_retries_for_invalid_output():
+    invalid = ApiResponse(200, {"choices": [{"message": {"content": "not json"}}]}, 1.0, tokens_consumed=2)
+    with patch("paper_analysis.analysis.dispatch_api_request", side_effect=[invalid, invalid, invalid, _response("retry")]) as dispatch:
+        result = await _run_judge("Grammar", JUDGE_RUBRICS["Grammar"], "A paper paragraph.")
+    assert result.score is not None
+    assert len(result.findings) == 3
+    assert dispatch.call_count == 4
